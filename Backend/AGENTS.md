@@ -1,4 +1,6 @@
-# FollowUP Backend - Development Guide
+# FollowUP Backend - Development Rules
+
+> 此文件为 AI Agent 开发规则，架构图请参考 [README.md](README.md)
 
 ## Project Overview
 
@@ -6,9 +8,7 @@
 
 ---
 
-## Architecture
-
-### Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|------------|

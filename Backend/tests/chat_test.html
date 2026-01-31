@@ -145,6 +145,14 @@
         let sessionId = null;
         let selectedFiles = [];
 
+        // 初始化 sessionId 为 token 值
+        function initSessionId() {
+            const token = document.getElementById('token').value.trim();
+            if (token && !sessionId) {
+                sessionId = token;
+            }
+        }
+
         // 绑定事件处理器
         function initEventListeners() {
             // 绑定文件选择事件
@@ -172,10 +180,14 @@
 
         // 页面加载完成后绑定事件处理器
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initEventListeners);
+            document.addEventListener('DOMContentLoaded', () => {
+                initEventListeners();
+                initSessionId();
+            });
         } else {
             // DOM 已经加载完成，直接初始化
             initEventListeners();
+            initSessionId();
         }
 
         // 处理文件选择
@@ -263,6 +275,11 @@
             const apiUrl = document.getElementById('apiUrl').value.trim();
             const token = document.getElementById('token').value.trim();
             const streamMode = document.getElementById('streamMode').checked;
+
+            // 初始化 sessionId（如果尚未初始化，则使用 token）
+            if (!sessionId && token) {
+                sessionId = token;
+            }
 
             // 验证：必须有消息或文件
             if (!message && selectedFiles.length === 0) {
@@ -764,7 +781,8 @@
                 });
 
                 if (response.ok) {
-                    sessionId = null;
+                    // 重置 sessionId 为 token
+                    sessionId = token;
                     document.getElementById('messages').innerHTML = `
                         <div class="text-center text-slate-400 text-sm py-8">
                             对话已清除

@@ -842,6 +842,7 @@ def run_agent(
     user_id: int,
     db: Session,
     image_base64: Optional[str] = None,
+    images_base64: Optional[List[str]] = None,
     conversation_history: str = "",
 ) -> dict:
     """
@@ -851,7 +852,8 @@ def run_agent(
         message: 用户消息
         user_id: 用户 ID
         db: 数据库会话
-        image_base64: 可选的图片 base64
+        image_base64: 可选的单张图片 base64（向后兼容）
+        images_base64: 可选的多张图片 base64 列表
         conversation_history: 对话历史
         
     Returns:
