@@ -5,10 +5,11 @@ LLM Service - 使用 LangChain + OpenAI 进行日程解析
 - 初始化和管理 LLM 实例
 - 调用 LLM API 解析文本和图像
 - 将 LLM 响应转换为业务模型
+- 支持信息不完整时反问用户
 """
 import os
 import time
-from typing import List, Optional
+from typing import List, Optional, NamedTuple
 from datetime import datetime
 
 from langchain_openai import ChatOpenAI
@@ -25,6 +26,13 @@ from services.prompts import (
 )
 
 logger = get_logger(__name__)
+
+
+class ParseResult(NamedTuple):
+    """解析结果，包含事件列表和可能的澄清问题"""
+    events: List[ParsedEvent]
+    needs_clarification: bool = False
+    clarification_question: Optional[str] = None
 
 
 # ============================================================================
@@ -61,16 +69,16 @@ def get_llm() -> ChatOpenAI:
 def parse_text_with_llm(
     text: str,
     additional_note: Optional[str] = None,
-) -> List[ParsedEvent]:
+) -> ParseResult:
     """
     使用 LangChain + OpenAI 解析文字中的日程信息
     
     Args:
         text: 输入文字
-        additional_note: 补充说明
+        additional_note: 补充说明（可包含用户对澄清问题的回答）
         
     Returns:
-        解析出的事件列表
+        ParseResult: 包含事件列表和可能的澄清问题
     """
     start_time = time.time()
     logger.debug(f"Starting LLM text parsing (text_length={len(text)})")
@@ -96,16 +104,27 @@ def parse_text_with_llm(
         elapsed = time.time() - start_time
         logger.info(f"LLM API call completed in {elapsed:.2f}s")
         
+        # 检查是否需要澄清
+        needs_clarification = result.get("needs_clarification", False)
+        clarification_question = result.get("clarification_question")
+        
+        if needs_clarification:
+            logger.info(f"LLM requests clarification: {clarification_question}")
+        
         # 转换为 ParsedEvent
         events = _convert_to_parsed_events(result, source_type="text")
         
-        logger.info(f"LLM text parsing completed: {len(events)} event(s) extracted")
-        return events
+        logger.info(f"LLM text parsing completed: {len(events)} event(s) extracted, needs_clarification={needs_clarification}")
+        return ParseResult(
+            events=events,
+            needs_clarification=needs_clarification,
+            clarification_question=clarification_question,
+        )
     
     except Exception as e:
         elapsed = time.time() - start_time
         logger.error(f"LLM text parsing failed after {elapsed:.2f}s: {e}", exc_info=True)
-        return []
+        return ParseResult(events=[], needs_clarification=False, clarification_question=None)
 
 
 # ============================================================================
@@ -115,16 +134,16 @@ def parse_text_with_llm(
 def parse_image_with_llm(
     image_base64: str,
     additional_note: Optional[str] = None,
-) -> List[ParsedEvent]:
+) -> ParseResult:
     """
     使用 LangChain + OpenAI Vision 解析图片中的日程信息
     
     Args:
         image_base64: Base64 编码的图片
-        additional_note: 补充说明
+        additional_note: 补充说明（可包含用户对澄清问题的回答）
         
     Returns:
-        解析出的事件列表
+        ParseResult: 包含事件列表和可能的澄清问题
     """
     start_time = time.time()
     logger.debug(f"Starting LLM image parsing (base64_length={len(image_base64)})")
@@ -168,16 +187,27 @@ def parse_image_with_llm(
         # 解析 JSON 响应
         result = parser.parse(response.content)
         
+        # 检查是否需要澄清
+        needs_clarification = result.get("needs_clarification", False)
+        clarification_question = result.get("clarification_question")
+        
+        if needs_clarification:
+            logger.info(f"LLM requests clarification: {clarification_question}")
+        
         # 转换为 ParsedEvent
         events = _convert_to_parsed_events(result, source_type="image")
         
-        logger.info(f"LLM image parsing completed: {len(events)} event(s) extracted")
-        return events
+        logger.info(f"LLM image parsing completed: {len(events)} event(s) extracted, needs_clarification={needs_clarification}")
+        return ParseResult(
+            events=events,
+            needs_clarification=needs_clarification,
+            clarification_question=clarification_question,
+        )
     
     except Exception as e:
         elapsed = time.time() - start_time
         logger.error(f"LLM image parsing failed after {elapsed:.2f}s: {e}", exc_info=True)
-        return []
+        return ParseResult(events=[], needs_clarification=False, clarification_question=None)
 
 
 def parse_images_with_llm(

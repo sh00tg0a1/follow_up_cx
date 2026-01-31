@@ -178,6 +178,27 @@ async def handle_chat_stream(state: AgentState):
     state["action_result"] = None
 
 
+def check_duplicate_event(db: Session, user_id: int, title: str, start_time: datetime) -> Event | None:
+    """
+    检查是否存在重复事件（相同标题 + 相同开始时间）
+    
+    Args:
+        db: 数据库会话
+        user_id: 用户 ID
+        title: 事件标题
+        start_time: 开始时间
+        
+    Returns:
+        如果存在重复事件，返回该事件；否则返回 None
+    """
+    existing = db.query(Event).filter(
+        Event.user_id == user_id,
+        Event.title == title,
+        Event.start_time == start_time,
+    ).first()
+    return existing
+
+
 def handle_create_event(state: AgentState) -> AgentState:
     """处理创建日程（支持多图片）"""
     logger.debug("Handling create event...")
@@ -208,7 +229,17 @@ def handle_create_event(state: AgentState) -> AgentState:
             
             # 为每个解析出的事件创建数据库记录
             created_events = []
+            duplicate_events = []
             for parsed_event in parsed_events:
+                # 检查是否重复
+                duplicate = check_duplicate_event(
+                    db, state["user_id"], parsed_event.title, parsed_event.start_time
+                )
+                if duplicate:
+                    duplicate_events.append(duplicate)
+                    logger.info(f"Duplicate event detected: {parsed_event.title} at {parsed_event.start_time}")
+                    continue
+                
                 # 生成缩略图（使用第一张图片）
                 thumbnail = None
                 if images_base64:
@@ -260,39 +291,61 @@ def handle_create_event(state: AgentState) -> AgentState:
                 logger.warning(f"Failed to generate embeddings: {e}")
             
             # 构建响应
-            if len(created_events) == 1:
-                event = created_events[0]
-                response_text = f"好的，我已经为您创建了日程：\n\n"
-                response_text += f"📅 **{event.title}**\n"
-                response_text += f"⏰ 时间：{event.start_time.strftime('%Y年%m月%d日 %H:%M')}"
-                if event.end_time:
-                    response_text += f" - {event.end_time.strftime('%H:%M')}"
-                response_text += "\n"
-                if event.location:
-                    response_text += f"📍 地点：{event.location}\n"
-                if event.description:
-                    response_text += f"📝 备注：{event.description}\n"
-            else:
-                response_text = f"好的，我已经从 {len(images_base64)} 张图片中为您创建了 {len(created_events)} 个日程：\n\n"
-                for idx, event in enumerate(created_events, 1):
-                    response_text += f"{idx}. **{event.title}** - {event.start_time.strftime('%Y年%m月%d日 %H:%M')}\n"
+            response_text = ""
+            
+            # 如果有重复事件，先提示用户
+            if duplicate_events:
+                if len(duplicate_events) == 1:
+                    dup = duplicate_events[0]
+                    response_text += f"⚠️ 这个日程已经存在了：**{dup.title}**（{dup.start_time.strftime('%Y年%m月%d日 %H:%M')}）。需要我帮您修改吗？\n\n"
+                else:
+                    response_text += f"⚠️ 发现 {len(duplicate_events)} 个重复的日程，已跳过。\n\n"
+            
+            # 如果有新创建的事件，显示创建结果
+            if created_events:
+                if len(created_events) == 1:
+                    event = created_events[0]
+                    response_text += f"好的，我已经为您创建了日程：\n\n"
+                    response_text += f"📅 **{event.title}**\n"
+                    response_text += f"⏰ 时间：{event.start_time.strftime('%Y年%m月%d日 %H:%M')}"
+                    if event.end_time:
+                        response_text += f" - {event.end_time.strftime('%H:%M')}"
+                    response_text += "\n"
+                    if event.location:
+                        response_text += f"📍 地点：{event.location}\n"
+                    if event.description:
+                        response_text += f"📝 备注：{event.description}\n"
+                else:
+                    response_text += f"好的，我已经从 {len(images_base64)} 张图片中为您创建了 {len(created_events)} 个日程：\n\n"
+                    for idx, event in enumerate(created_events, 1):
+                        response_text += f"{idx}. **{event.title}** - {event.start_time.strftime('%Y年%m月%d日 %H:%M')}\n"
+            
+            # 如果既没有创建也没有重复，说明所有事件都重复了
+            if not created_events and not duplicate_events:
+                response_text = "抱歉，无法从图片中提取到有效的日程信息。"
+            
+            # 为每个创建的事件生成 ICS 内容
+            from services.ics_service import generate_ics_content
+            events_with_ics = []
+            for e in created_events:
+                events_with_ics.append({
+                    "id": e.id,
+                    "title": e.title,
+                    "start_time": e.start_time.isoformat(),
+                    "end_time": e.end_time.isoformat() if e.end_time else None,
+                    "location": e.location,
+                    "ics_content": generate_ics_content(e),
+                    "ics_download_url": f"/api/events/{e.id}/ics",
+                })
             
             return {
                 **state,
                 "response": response_text,
                 "action_result": {
+                    "action": "create_event",
                     "event_ids": [e.id for e in created_events],
                     "events_count": len(created_events),
-                    "events": [
-                        {
-                            "id": e.id,
-                            "title": e.title,
-                            "start_time": e.start_time.isoformat(),
-                            "end_time": e.end_time.isoformat() if e.end_time else None,
-                            "location": e.location,
-                        }
-                        for e in created_events
-                    ],
+                    "events": events_with_ics,
                 },
             }
         except Exception as e:
@@ -339,17 +392,37 @@ def handle_create_event(state: AgentState) -> AgentState:
         
         event_data = json.loads(content.strip())
         
+        title = event_data.get("title", "新日程")
+        start_time = datetime.fromisoformat(event_data["start_time"])
+        
+        # 检查是否重复
+        duplicate = check_duplicate_event(db, state["user_id"], title, start_time)
+        if duplicate:
+            logger.info(f"Duplicate event detected: {title} at {start_time}")
+            return {
+                **state,
+                "response": f"⚠️ 这个日程已经存在了：**{duplicate.title}**（{duplicate.start_time.strftime('%Y年%m月%d日 %H:%M')}）。需要我帮您修改吗？",
+                "action_result": {
+                    "action": "create_event",
+                    "duplicate": True,
+                    "existing_event_id": duplicate.id,
+                    "existing_event_title": duplicate.title,
+                },
+            }
+        
         # 创建事件
         event = Event(
             user_id=state["user_id"],
-            title=event_data.get("title", "新日程"),
-            start_time=datetime.fromisoformat(event_data["start_time"]),
+            title=title,
+            start_time=start_time,
             end_time=datetime.fromisoformat(event_data["end_time"]) if event_data.get("end_time") else None,
             location=event_data.get("location"),
             description=event_data.get("description"),
             source_type="agent",
             is_followed=True,
         )
+        # 检查数据库是否有 embedding 列，如果没有则从实例中移除该属性
+        Event.remove_embedding_if_not_exists(db, event)
         db.add(event)
         db.commit()
         db.refresh(event)
@@ -379,6 +452,10 @@ def handle_create_event(state: AgentState) -> AgentState:
         except Exception as e:
             logger.warning(f"Failed to generate embedding for event {event.id}: {e}")
         
+        # 生成 ICS 文件内容
+        from services.ics_service import generate_ics_content
+        ics_content = generate_ics_content(event)
+        
         # 构建响应
         response_text = f"好的，我已经为您创建了日程：\n\n"
         response_text += f"📅 **{event.title}**\n"
@@ -398,6 +475,8 @@ def handle_create_event(state: AgentState) -> AgentState:
                 "action": "create_event",
                 "event_id": event.id,
                 "event_title": event.title,
+                "ics_content": ics_content,
+                "ics_download_url": f"/api/events/{event.id}/ics",
             },
         }
         

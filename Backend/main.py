@@ -47,8 +47,9 @@ async def startup_event():
     # 运行数据库迁移（添加缺失的列等）
     # 迁移是幂等的，可以安全地多次运行
     try:
-        from migrate_db import migrate_events_table
+        from migrate_db import migrate_events_table, migrate_pgvector
         migrate_events_table()
+        migrate_pgvector()  # 添加 pgvector 支持
         logger.info("Database migration completed successfully")
     except Exception as e:
         # 迁移失败不影响应用启动，只记录警告

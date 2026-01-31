@@ -28,6 +28,14 @@ class EventExtraction(BaseModel):
 class EventExtractionList(BaseModel):
     """事件列表"""
     events: List[EventExtraction] = Field(description="提取的事件列表")
+    needs_clarification: bool = Field(
+        default=False,
+        description="是否需要向用户澄清信息"
+    )
+    clarification_question: Optional[str] = Field(
+        None,
+        description="需要向用户询问的澄清问题"
+    )
 
 
 # ============================================================================
@@ -45,14 +53,27 @@ TEXT_PARSE_SYSTEM = """你是一个智能日程助手，擅长从自然语言文
 
 当前时间：{current_time}
 
-请以 JSON 格式返回结果，包含 events 数组，每个事件包含：
-- title: 事件标题
-- start_time: ISO 8601 格式的开始时间
-- end_time: ISO 8601 格式的结束时间（可选）
-- location: 地点（可选）
-- description: 描述（可选）
+**重要：信息不完整时需要反问用户**
+如果以下关键信息缺失或模糊，请设置 needs_clarification=true 并提出澄清问题：
+- 时间不明确（如"下周"但没说具体哪天，"晚上"但没说几点）
+- 事件类型不清楚
+- 有多种可能的理解方式
 
-如果文本中没有明确的日程信息，返回空数组。"""
+澄清问题应该简洁友好，一次只问一个最重要的问题。
+
+请以 JSON 格式返回结果：
+- events: 事件数组，每个事件包含 title, start_time, end_time, location, description
+- needs_clarification: 是否需要澄清（布尔值）
+- clarification_question: 澄清问题（仅当 needs_clarification=true 时）
+
+示例1 - 信息完整：
+{{"events": [...], "needs_clarification": false, "clarification_question": null}}
+
+示例2 - 需要澄清：
+{{"events": [], "needs_clarification": true, "clarification_question": "请问「下周开会」是指下周几呢？大概几点开始？"}}
+
+示例3 - 部分信息可提取，但仍需澄清：
+{{"events": [{{"title": "开会", "start_time": "2026-02-03T14:00:00", ...}}], "needs_clarification": true, "clarification_question": "我暂时假设是下周一下午2点，请问这个时间对吗？"}}"""
 
 TEXT_PARSE_USER = "用户输入：{text}\n补充说明：{additional_note}"
 
@@ -77,11 +98,24 @@ IMAGE_PARSE_SYSTEM_PROMPT = """你是一个智能日程助手，擅长从图片�
 
 当前时间：{current_time}
 
-请以 JSON 格式返回结果，包含 events 数组，每个事件包含：
-- title: 事件标题
-- start_time: ISO 8601 格式的开始时间
-- end_time: ISO 8601 格式的结束时间（可选）
-- location: 地点（可选）
-- description: 描述（可选）
+**重要：信息不完整时需要反问用户**
+如果以下关键信息在图片中缺失或无法识别，请设置 needs_clarification=true 并提出澄清问题：
+- 日期或时间不清楚（如只有时间没有日期，或年份不明确）
+- 地点信息模糊
+- 图片质量差无法完全识别
 
-如果图片中没有明确的日程信息，返回空数组。"""
+澄清问题应该简洁友好，一次只问一个最重要的问题。
+
+请以 JSON 格式返回结果：
+- events: 事件数组，每个事件包含 title, start_time, end_time, location, description
+- needs_clarification: 是否需要澄清（布尔值）
+- clarification_question: 澄清问题（仅当 needs_clarification=true 时）
+
+示例1 - 信息完整：
+{{"events": [...], "needs_clarification": false, "clarification_question": null}}
+
+示例2 - 需要澄清：
+{{"events": [], "needs_clarification": true, "clarification_question": "图片中的活动是今年还是明年举办呢？"}}
+
+示例3 - 部分信息可提取，但仍需澄清：
+{{"events": [{{"title": "音乐会", "start_time": "2026-03-15T19:30:00", ...}}], "needs_clarification": true, "clarification_question": "图片中没有显示年份，我假设是2026年，请问对吗？"}}"""

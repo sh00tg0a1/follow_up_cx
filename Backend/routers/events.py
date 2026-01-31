@@ -9,7 +9,6 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
-from icalendar import Calendar, Event as ICalEvent
 
 from schemas import (
     EventCreate,
@@ -169,6 +168,20 @@ async def create_event(
     """
     from services.embedding_service import generate_event_embedding, is_postgres
     
+    # 检查是否重复
+    duplicate = db.query(Event).filter(
+        Event.user_id == current_user.id,
+        Event.title == request.title,
+        Event.start_time == request.start_time,
+    ).first()
+    
+    if duplicate:
+        logger.info(f"Duplicate event detected for user {current_user.username}: {request.title} at {request.start_time}")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"这个日程已经存在了：{duplicate.title}（{duplicate.start_time.strftime('%Y年%m月%d日 %H:%M')}）",
+        )
+    
     event = Event(
         user_id=current_user.id,
         title=request.title,
@@ -180,6 +193,9 @@ async def create_event(
         source_thumbnail=request.source_thumbnail,
         is_followed=request.is_followed,
     )
+    
+    # 检查数据库是否有 embedding 列，如果没有则从实例中移除该属性
+    Event.remove_embedding_if_not_exists(db, event)
 
     db.add(event)
     db.commit()
@@ -206,7 +222,8 @@ async def create_event(
         except Exception as e:
             logger.warning(f"Failed to generate embedding for event {event.id}: {e}")
 
-    return event_to_response(event)
+    # 创建事件时返回 ICS 内容
+    return event_to_response(event, include_ics=True)
 
 
 @router.get("/{event_id}", response_model=EventResponse)
@@ -366,31 +383,9 @@ async def download_ics(
             detail="Event not found",
         )
 
-    cal = Calendar()
-    cal.add("prodid", "-//FollowUP//followup.app//")
-    cal.add("version", "2.0")
-    cal.add("calscale", "GREGORIAN")
-    cal.add("method", "PUBLISH")
-
-    ical_event = ICalEvent()
-    ical_event.add("summary", event.title)
-    ical_event.add("dtstart", event.start_time)
-
-    if event.end_time:
-        ical_event.add("dtend", event.end_time)
-
-    if event.location:
-        ical_event.add("location", event.location)
-
-    if event.description:
-        ical_event.add("description", event.description)
-
-    ical_event.add("dtstamp", datetime.utcnow())
-    ical_event.add("uid", f"event-{event_id}@followup.app")
-
-    cal.add_component(ical_event)
-
-    ics_content = cal.to_ical()
+    # 使用 ICS 服务生成内容
+    from services.ics_service import generate_ics_bytes
+    ics_content = generate_ics_bytes(event)
 
     # 使用 ASCII 安全的文件名，避免 HTTP 头编码问题
     safe_title = "".join(c for c in event.title if c.isascii() and (c.isalnum() or c in " -_")).strip()

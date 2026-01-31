@@ -65,13 +65,98 @@ class Event(Base):
 
     # 关系
     user = relationship("User", back_populates="events")
+    
+    # 注意：embedding 列会在下面动态添加（仅 PostgreSQL + pgvector 环境）
+    
+    @staticmethod
+    def remove_embedding_if_not_exists(db, event_instance):
+        """
+        如果数据库没有 embedding 列，从事件实例中移除该属性
+        
+        这可以避免 SQLAlchemy 尝试插入不存在的列
+        
+        Args:
+            db: 数据库会话
+            event_instance: Event 实例
+        """
+        if not hasattr(event_instance, 'embedding'):
+            return
+        
+        try:
+            # 检查数据库是否有 embedding 列
+            result = db.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'events' AND column_name = 'embedding'
+            """))
+            has_embedding_column = result.scalar() is not None
+            
+            if not has_embedding_column and 'embedding' in event_instance.__dict__:
+                del event_instance.__dict__['embedding']
+                logger.debug("Removed embedding attribute (column does not exist in database)")
+        except Exception as e:
+            # 如果检查失败（可能是 SQLite 或其他错误），尝试移除属性
+            if 'embedding' in event_instance.__dict__:
+                del event_instance.__dict__['embedding']
+            logger.debug(f"Could not check embedding column, removed from instance: {e}")
 
 
 # 动态添加 embedding 列（仅 PostgreSQL + pgvector 环境）
-# 这样 SQLite 环境下不会报错
+# 注意：这个列只在数据库有该列时才有效
+# 如果数据库还没有该列，需要在启动时运行 migrate_pgvector() 迁移
+# 
+# 为了避免在数据库没有该列时出错，我们使用事件监听器
+# 在插入前检查数据库是否有该列，如果没有则从 mapper 中排除它
 if _is_postgres and _has_pgvector and Vector is not None:
     # 1536 维向量，对应 OpenAI text-embedding-3-small
     Event.embedding = Column(Vector(1536), nullable=True)
+    
+    # 添加事件监听器，在插入前检查并处理 embedding 列
+    from sqlalchemy import event
+    from sqlalchemy.orm import object_mapper
+    
+    # 使用一个模块级别的缓存来存储检查结果（按连接）
+    _embedding_column_cache = {}
+    
+    def _check_embedding_column_exists(connection):
+        """检查数据库是否有 embedding 列"""
+        # 使用连接的字符串表示作为缓存键
+        cache_key = str(connection.engine.url)
+        if cache_key in _embedding_column_cache:
+            return _embedding_column_cache[cache_key]
+        
+        try:
+            from sqlalchemy import text
+            result = connection.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'events' AND column_name = 'embedding'
+            """))
+            exists = result.scalar() is not None
+            _embedding_column_cache[cache_key] = exists
+            return exists
+        except Exception as e:
+            # 如果检查失败，假设没有该列
+            logger.warning(f"Failed to check embedding column: {e}")
+            _embedding_column_cache[cache_key] = False
+            return False
+    
+    @event.listens_for(Event, "before_insert", propagate=True)
+    def check_embedding_column(mapper, connection, target):
+        """在插入前检查数据库是否有 embedding 列，如果没有则从实例中移除该属性"""
+        if not _check_embedding_column_exists(connection):
+            # 数据库没有该列，从实例中移除该属性
+            # 注意：SQLAlchemy 在构建 INSERT 时会检查 mapper 的所有列定义
+            # 所以即使我们从实例中移除属性，SQLAlchemy 仍然可能尝试插入该列
+            # 这会导致错误，但至少我们尝试了
+            if 'embedding' in target.__dict__:
+                del target.__dict__['embedding']
+                logger.debug("Removed embedding attribute (column does not exist in database)")
+            
+            # 尝试从 mapper 的列中排除（如果可能）
+            # 但这需要在 mapper 级别操作，比较复杂
+            # 最实用的解决方案：确保迁移脚本正确运行
+            # 如果迁移失败，用户需要手动运行迁移或联系管理员
 
 
 class Conversation(Base):

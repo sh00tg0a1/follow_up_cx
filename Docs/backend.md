@@ -79,7 +79,7 @@
 | image_base64 | string | 否 | 图片 base64 编码 |
 | additional_note | string | 否 | 补充说明 |
 
-**响应 200**:
+**响应 200**（信息完整时）:
 ```json
 {
   "events": [
@@ -95,9 +95,27 @@
       "is_followed": false
     }
   ],
-  "parse_id": "uuid-xxx"
+  "parse_id": "uuid-xxx",
+  "needs_clarification": false,
+  "clarification_question": null
 }
 ```
+
+**响应 200**（需要澄清时）:
+```json
+{
+  "events": [],
+  "parse_id": "uuid-xxx",
+  "needs_clarification": true,
+  "clarification_question": "请问「下周开会」是指下周几呢？大概几点开始？"
+}
+```
+
+> **澄清机制**：
+> - 当时间、地点等关键信息不明确时，`needs_clarification` 返回 `true`
+> - 前端应展示 `clarification_question` 让用户回答
+> - 用户回答后，将回答放入 `additional_note` 再次调用解析接口
+> - 示例：用户回答"下周三下午2点"，前端发送 `{"input_type": "text", "text_content": "原始文本", "additional_note": "下周三下午2点"}`
 
 > **注意**：当 `input_type` 为 `image` 时，`source_thumbnail` 会自动生成为 200x200 的 JPEG 缩略图（base64 编码），方便前端展示图片来源
 ```

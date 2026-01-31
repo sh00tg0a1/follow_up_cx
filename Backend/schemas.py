@@ -56,6 +56,8 @@ class ParseResponse(BaseModel):
     """日程解析响应"""
     events: List[ParsedEvent]
     parse_id: str
+    needs_clarification: bool = False  # 是否需要用户澄清信息
+    clarification_question: Optional[str] = None  # 澄清问题（当 needs_clarification=True 时）
 
 
 # ============ 活动管理相关 ============
@@ -94,6 +96,8 @@ class EventResponse(BaseModel):
     source_thumbnail: Optional[str] = None  # 图片来源的缩略图（base64）
     is_followed: bool = False
     created_at: datetime
+    ics_content: Optional[str] = None  # ICS 文件内容（base64 编码），创建事件时返回
+    ics_download_url: Optional[str] = None  # ICS 文件下载 URL
 
 
 class EventListResponse(BaseModel):

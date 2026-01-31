@@ -114,10 +114,19 @@ def is_llm_available() -> bool:
         return False
 
 
-def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
+class TextParseResult:
+    """文本解析结果"""
+    def __init__(self, events: list, needs_clarification: bool = False, clarification_question: str = None):
+        self.events = events
+        self.needs_clarification = needs_clarification
+        self.clarification_question = clarification_question
+
+
+def parse_text(text: str, additional_note: str = None) -> TextParseResult:
     """
     解析文字内容
     优先使用 LLM，如果 LLM 不可用则使用简单的关键词解析
+    返回包含事件列表和可能的澄清问题
     """
     llm_available = is_llm_available()
     logger.debug(f"Parsing text (length={len(text)}, LLM_AVAILABLE={llm_available})")
@@ -125,14 +134,14 @@ def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
     
     if llm_available:
         try:
-            events = parse_text_with_llm(text, additional_note)
+            result = parse_text_with_llm(text, additional_note)
             elapsed = time.time() - start_time
-            if events:
-                logger.info(f"LLM parsed {len(events)} event(s) from text in {elapsed:.2f}s")
-                return events
-            else:
-                logger.warning(f"LLM returned no events from text")
-                # 对于文本，可以尝试简单的关键词解析作为降级
+            logger.info(f"LLM parsed {len(result.events)} event(s) from text in {elapsed:.2f}s")
+            return TextParseResult(
+                events=result.events,
+                needs_clarification=result.needs_clarification,
+                clarification_question=result.clarification_question,
+            )
         except Exception as e:
             logger.error(f"LLM text parsing failed: {e}", exc_info=True)
     
@@ -142,14 +151,23 @@ def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
     events = parse_text_fallback(text, additional_note)
     if events:
         logger.info(f"Keyword parser extracted {len(events)} event(s) from text")
-    return events
+    return TextParseResult(events=events, needs_clarification=False, clarification_question=None)
 
 
-def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEvent]:
+class ImageParseResult:
+    """图片解析结果"""
+    def __init__(self, events: list, needs_clarification: bool = False, clarification_question: str = None):
+        self.events = events
+        self.needs_clarification = needs_clarification
+        self.clarification_question = clarification_question
+
+
+def parse_image(image_base64: str, additional_note: str = None) -> ImageParseResult:
     """
     解析单张图片内容
     使用 LLM Vision 解析图片中的日程信息
     同时生成缩略图附加到每个事件
+    返回包含事件列表和可能的澄清问题
     """
     # 生成缩略图
     thumbnail = generate_thumbnail(image_base64)
@@ -168,17 +186,18 @@ def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEv
     
     # 解析图片
     try:
-        events = parse_image_with_llm(image_base64, additional_note)
-        if events:
-            logger.info(f"LLM parsed {len(events)} event(s) from image")
-            # 为每个事件附加缩略图
-            for event in events:
-                event.source_thumbnail = thumbnail
-            return events
-        else:
-            logger.warning("LLM returned no events from image")
-            # 返回空列表，不使用 mock 数据
-            return []
+        result = parse_image_with_llm(image_base64, additional_note)
+        logger.info(f"LLM parsed {len(result.events)} event(s) from image")
+        
+        # 为每个事件附加缩略图
+        for event in result.events:
+            event.source_thumbnail = thumbnail
+        
+        return ImageParseResult(
+            events=result.events,
+            needs_clarification=result.needs_clarification,
+            clarification_question=result.clarification_question,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -258,6 +277,9 @@ async def parse_event(
     - text: 从文字描述中提取日程
     - image: 从图片（海报等）中识别日程
     
+    当信息不完整时，会返回 needs_clarification=true 和澄清问题，
+    前端可以将用户的回答放入 additional_note 再次调用解析接口。
+    
     需要认证：Authorization: Bearer <token>
     """
     parse_id = str(uuid.uuid4())
@@ -266,6 +288,11 @@ async def parse_event(
         f"type={request.input_type}, parse_id={parse_id}"
     )
     
+    # 初始化结果变量
+    events = []
+    needs_clarification = False
+    clarification_question = None
+    
     if request.input_type == "text":
         if not request.text_content:
             logger.warning(f"Parse failed: text_content is required")
@@ -273,7 +300,10 @@ async def parse_event(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="text_content is required for text input type",
             )
-        events = parse_text(request.text_content, request.additional_note)
+        result = parse_text(request.text_content, request.additional_note)
+        events = result.events
+        needs_clarification = result.needs_clarification
+        clarification_question = result.clarification_question
     
     elif request.input_type == "image":
         # 支持单张或多张图片
@@ -295,9 +325,12 @@ async def parse_event(
         # 处理多张图片
         if len(images_to_parse) == 1:
             # 单张图片：使用原有逻辑（包含缩略图生成）
-            events = parse_image(images_to_parse[0], request.additional_note)
+            result = parse_image(images_to_parse[0], request.additional_note)
+            events = result.events
+            needs_clarification = result.needs_clarification
+            clarification_question = result.clarification_question
         else:
-            # 多张图片：批量处理
+            # 多张图片：批量处理（暂不支持澄清问题）
             events = parse_images(images_to_parse, request.additional_note)
     
     else:
@@ -310,10 +343,13 @@ async def parse_event(
     logger.info(
         f"Parse completed: parse_id={parse_id}, "
         f"user={current_user.username}, "
-        f"events_count={len(events)}"
+        f"events_count={len(events)}, "
+        f"needs_clarification={needs_clarification}"
     )
     
     return ParseResponse(
         events=events,
         parse_id=parse_id,
+        needs_clarification=needs_clarification,
+        clarification_question=clarification_question,
     )

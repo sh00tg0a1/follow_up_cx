@@ -110,17 +110,25 @@ def migrate_pgvector():
             
             if not embedding_exists:
                 logger.info("Adding embedding column to events table...")
-                db.execute(text("""
-                    ALTER TABLE events 
-                    ADD COLUMN embedding vector(1536)
-                """))
-                db.commit()
-                logger.info("Successfully added embedding column")
+                try:
+                    db.execute(text("""
+                        ALTER TABLE events 
+                        ADD COLUMN embedding vector(1536)
+                    """))
+                    db.commit()
+                    logger.info("Successfully added embedding column")
+                except Exception as alter_error:
+                    logger.error(f"Failed to add embedding column: {alter_error}")
+                    db.rollback()
+                    # 如果添加列失败，记录错误但不抛出异常
+                    # 这样应用仍然可以启动，但 embedding 功能不可用
+                    logger.warning("Embedding column not added. Vector search will not be available.")
             else:
                 logger.debug("embedding column already exists")
         except Exception as e:
-            logger.warning(f"Failed to add embedding column: {e}")
+            logger.error(f"Failed to check/add embedding column: {e}", exc_info=True)
             db.rollback()
+            # 不抛出异常，允许应用继续启动
         
         # 3. 创建向量索引（使用 IVFFlat 索引加速搜索）
         try:
