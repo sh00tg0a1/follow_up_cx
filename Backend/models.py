@@ -1,11 +1,27 @@
 """
 数据库模型 - SQLAlchemy ORM
+
+支持的数据库:
+- SQLite (开发环境): 不支持向量搜索
+- PostgreSQL (生产环境): 支持 pgvector 向量搜索
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
 from database import Base
+from config import settings
+
+# 检查是否为 PostgreSQL 环境，决定是否启用向量字段
+_is_postgres = settings.DATABASE_URL.startswith("postgresql")
+
+# 尝试导入 pgvector（仅在 PostgreSQL 环境下需要）
+try:
+    from pgvector.sqlalchemy import Vector
+    _has_pgvector = True
+except ImportError:
+    _has_pgvector = False
+    Vector = None
 
 
 class User(Base):
@@ -49,6 +65,13 @@ class Event(Base):
 
     # 关系
     user = relationship("User", back_populates="events")
+
+
+# 动态添加 embedding 列（仅 PostgreSQL + pgvector 环境）
+# 这样 SQLite 环境下不会报错
+if _is_postgres and _has_pgvector and Vector is not None:
+    # 1536 维向量，对应 OpenAI text-embedding-3-small
+    Event.embedding = Column(Vector(1536), nullable=True)
 
 
 class Conversation(Base):

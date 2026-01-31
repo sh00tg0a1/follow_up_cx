@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from schemas import ChatRequest, ChatResponse
 from auth import get_current_user
-from database import get_db
+from database import get_db, SessionLocal
 from models import User
 from logging_config import get_logger
 from services.agent import run_agent, run_agent_stream, ConversationMemory
@@ -47,24 +47,7 @@ async def chat(
     
     需要认证：Authorization: Bearer <token>
     """
-    # 提前捕获 user_id，避免在 StreamingResponse 中访问 detached 的 User 对象
-    user_id = current_user.id
-    username = current_user.username
-    
-    logger.info(f"Chat request from user {username}: {request.message[:50]}... (stream={stream})")
-    
-    # 初始化对话记忆
-    memory = ConversationMemory(
-        db=db,
-        user_id=user_id,
-        session_id=request.session_id,
-    )
-    
-    # 获取对话历史
-    conversation_history = memory.get_formatted_history(limit=10)
-    
-    # 添加用户消息到记忆
-    memory.add_message("user", request.message)
+    logger.info(f"Chat request from user {current_user.username}: {request.message[:50]}... (stream={stream})")
     
     # 处理图片：支持单张或多张图片
     images_base64 = []
@@ -78,9 +61,36 @@ async def chat(
     image_base64_for_agent = images_base64[0] if images_base64 else None
     
     if stream:
+        # 流式响应需要在生成器内获取对话历史
+        # 预先获取对话历史（在原 Session 有效时）
+        memory_for_history = ConversationMemory(
+            db=db,
+            user_id=current_user.id,
+            session_id=request.session_id,
+        )
+        conversation_history = memory_for_history.get_formatted_history(limit=10)
         # 流式响应
+        # 注意：需要在生成器内部创建独立的数据库会话，因为 FastAPI 的依赖注入会在返回 StreamingResponse 后关闭原 Session
+        
+        # 预先获取需要的用户信息（避免在生成器中访问已关闭的 Session）
+        user_id = current_user.id
+        session_id = request.session_id
+        message = request.message
+        
         async def generate_stream():
+            # 在生成器内部创建独立的数据库会话
+            stream_db = SessionLocal()
             try:
+                # 重新初始化对话记忆（使用新的 Session）
+                stream_memory = ConversationMemory(
+                    db=stream_db,
+                    user_id=user_id,
+                    session_id=session_id,
+                )
+                
+                # 添加用户消息到记忆
+                stream_memory.add_message("user", message)
+                
                 full_response = ""
                 intent = ""
                 action_result = None
@@ -89,28 +99,35 @@ async def chat(
                 yield f"data: {json.dumps({'type': 'status', 'message': '正在识别意图...'}, ensure_ascii=False)}\n\n"
                 
                 async for chunk in run_agent_stream(
-                    message=request.message,
+                    message=message,
                     user_id=user_id,
-                    db=db,
+                    db=stream_db,
                     image_base64=image_base64_for_agent,
                     images_base64=images_base64 if len(images_base64) > 1 else None,
                     conversation_history=conversation_history,
                 ):
-                    if chunk["type"] == "intent":
+                    if chunk["type"] == "thinking":
+                        yield f"data: {json.dumps({'type': 'thinking', 'message': chunk['message']}, ensure_ascii=False)}\n\n"
+                    elif chunk["type"] == "intent":
                         intent = chunk["intent"]
                         yield f"data: {json.dumps({'type': 'intent', 'intent': intent}, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "token":
                         token = chunk["token"]
                         full_response += token
                         yield f"data: {json.dumps({'type': 'token', 'token': token}, ensure_ascii=False)}\n\n"
+                    elif chunk["type"] == "content":
+                        # 非流式完整内容
+                        full_response = chunk.get("content", "")
+                        yield f"data: {json.dumps({'type': 'content', 'content': full_response}, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "action":
                         action_result = chunk["action_result"]
                         yield f"data: {json.dumps({'type': 'action', 'action_result': action_result}, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "done":
                         # 保存完整回复到记忆
-                        memory.add_message("assistant", full_response)
-                        logger.info(f"Chat completed: intent={intent}, session_id={memory.conversation_id}")
-                        yield f"data: {json.dumps({'type': 'done', 'session_id': memory.conversation_id}, ensure_ascii=False)}\n\n"
+                        if full_response:
+                            stream_memory.add_message("assistant", full_response)
+                        logger.info(f"Chat completed: intent={intent}, session_id={stream_memory.conversation_id}")
+                        yield f"data: {json.dumps({'type': 'done', 'session_id': stream_memory.conversation_id}, ensure_ascii=False)}\n\n"
                         break
                     elif chunk["type"] == "error":
                         error_msg = chunk.get("error", "未知错误")
@@ -120,6 +137,9 @@ async def chat(
             except Exception as e:
                 logger.error(f"Stream chat error: {e}", exc_info=True)
                 yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+            finally:
+                # 确保关闭数据库会话
+                stream_db.close()
         
         return StreamingResponse(
             generate_stream(),
@@ -131,11 +151,24 @@ async def chat(
             }
         )
     else:
-        # 非流式响应（原有逻辑）
+        # 非流式响应
+        # 初始化对话记忆
+        memory = ConversationMemory(
+            db=db,
+            user_id=current_user.id,
+            session_id=request.session_id,
+        )
+        
+        # 获取对话历史
+        conversation_history = memory.get_formatted_history(limit=10)
+        
+        # 添加用户消息到记忆
+        memory.add_message("user", request.message)
+        
         try:
             result = run_agent(
                 message=request.message,
-                user_id=user_id,
+                user_id=current_user.id,
                 db=db,
                 image_base64=image_base64_for_agent,
                 images_base64=images_base64 if len(images_base64) > 1 else None,
@@ -173,15 +206,12 @@ async def clear_conversation(
     
     需要认证：Authorization: Bearer <token>
     """
-    user_id = current_user.id
-    username = current_user.username
-    
-    logger.info(f"Clear conversation request from user {username}: session_id={session_id}")
+    logger.info(f"Clear conversation request from user {current_user.username}: session_id={session_id}")
     
     try:
         memory = ConversationMemory(
             db=db,
-            user_id=user_id,
+            user_id=current_user.id,
             session_id=session_id,
         )
         memory.clear()

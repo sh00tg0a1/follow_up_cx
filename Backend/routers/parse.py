@@ -21,7 +21,9 @@ logger = get_logger(__name__)
 # 尝试导入 LLM 服务，如果失败则使用 fallback
 try:
     from services.llm_service import parse_text_with_llm, parse_image_with_llm
-    LLM_AVAILABLE = os.getenv("OPENAI_API_KEY") is not None
+    from config import settings
+    # 检查 API key（同时检查 settings 和环境变量）
+    LLM_AVAILABLE = bool(settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY"))
     if LLM_AVAILABLE:
         logger.info("LLM service available (OpenAI API key configured)")
     else:
@@ -95,36 +97,33 @@ def parse_text_fallback(text: str, additional_note: str = None) -> list[ParsedEv
 
 def parse_image_fallback(image_base64: str, additional_note: str = None) -> list[ParsedEvent]:
     """
-    解析图片内容（Fallback - 模拟数据）
-    当 LLM 不可用时使用
+    解析图片内容（Fallback）
+    当 LLM 不可用时返回空列表，让调用方处理
     """
-    from datetime import datetime
-    
-    now = datetime.now()
-    next_month = now.month + 1 if now.month < 12 else 1
-    next_year = now.year if now.month < 12 else now.year + 1
-    
-    return [ParsedEvent(
-        id=None,
-        title="汉堡爱乐乐团音乐会",
-        start_time=datetime(next_year, next_month, 15, 19, 30),
-        end_time=datetime(next_year, next_month, 15, 22, 0),
-        location="Elbphilharmonie, Hamburg",
-        description="贝多芬第九交响曲\n指挥：Alan Gilbert\n\n" + (additional_note or ""),
-        source_type="image",
-        is_followed=False,
-    )]
+    logger.warning("Image parsing fallback called - LLM unavailable, cannot parse image")
+    # 不再返回 mock 数据，返回空列表
+    return []
+
+
+def is_llm_available() -> bool:
+    """动态检查 LLM 是否可用"""
+    try:
+        from config import settings
+        return bool(settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY"))
+    except Exception:
+        return False
 
 
 def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
     """
     解析文字内容
-    优先使用 LLM，失败时使用 fallback
+    优先使用 LLM，如果 LLM 不可用则使用简单的关键词解析
     """
-    logger.debug(f"Parsing text (length={len(text)}, LLM_AVAILABLE={LLM_AVAILABLE})")
+    llm_available = is_llm_available()
+    logger.debug(f"Parsing text (length={len(text)}, LLM_AVAILABLE={llm_available})")
     start_time = time.time()
     
-    if LLM_AVAILABLE:
+    if llm_available:
         try:
             events = parse_text_with_llm(text, additional_note)
             elapsed = time.time() - start_time
@@ -132,21 +131,24 @@ def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
                 logger.info(f"LLM parsed {len(events)} event(s) from text in {elapsed:.2f}s")
                 return events
             else:
-                logger.warning(f"LLM returned no events, using fallback")
+                logger.warning(f"LLM returned no events from text")
+                # 对于文本，可以尝试简单的关键词解析作为降级
         except Exception as e:
-            logger.error(f"LLM parsing failed: {e}", exc_info=True)
+            logger.error(f"LLM text parsing failed: {e}", exc_info=True)
     
-    # Fallback to simple parsing
-    logger.debug("Using fallback text parser")
+    # 对于文本解析，使用简单的关键词匹配作为降级方案
+    # 这不是 mock 数据，而是基于用户输入的实际解析
+    logger.debug("Using keyword-based text parser (fallback)")
     events = parse_text_fallback(text, additional_note)
-    logger.info(f"Fallback parser returned {len(events)} event(s)")
+    if events:
+        logger.info(f"Keyword parser extracted {len(events)} event(s) from text")
     return events
 
 
 def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEvent]:
     """
     解析单张图片内容
-    优先使用 LLM Vision，失败时使用 fallback
+    使用 LLM Vision 解析图片中的日程信息
     同时生成缩略图附加到每个事件
     """
     # 生成缩略图
@@ -154,53 +156,79 @@ def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEv
     if thumbnail:
         logger.debug(f"Generated thumbnail for image, size: {len(thumbnail)} chars")
     
+    llm_available = is_llm_available()
+    logger.debug(f"Parsing image (LLM_AVAILABLE={llm_available})")
+    
+    if not llm_available:
+        logger.error("Cannot parse image: LLM service unavailable (OPENAI_API_KEY not configured)")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="图片解析服务暂不可用，请联系管理员配置 OpenAI API Key",
+        )
+    
     # 解析图片
-    if LLM_AVAILABLE:
+    try:
         events = parse_image_with_llm(image_base64, additional_note)
         if events:
+            logger.info(f"LLM parsed {len(events)} event(s) from image")
             # 为每个事件附加缩略图
             for event in events:
                 event.source_thumbnail = thumbnail
             return events
-    
-    # Fallback to simple parsing
-    events = parse_image_fallback(image_base64, additional_note)
-    # 为每个事件附加缩略图
-    for event in events:
-        event.source_thumbnail = thumbnail
-    return events
+        else:
+            logger.warning("LLM returned no events from image")
+            # 返回空列表，不使用 mock 数据
+            return []
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LLM image parsing failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"图片解析失败: {str(e)}",
+        )
 
 
 def parse_images(images_base64: List[str], additional_note: str = None) -> list[ParsedEvent]:
     """
     批量解析多张图片内容
-    优先使用 LLM Vision 批量处理，失败时逐个处理
+    使用 LLM Vision 批量处理，失败时逐个处理
     为每张图片生成缩略图并附加到对应的事件
     """
-    logger.debug(f"Parsing {len(images_base64)} images (LLM_AVAILABLE={LLM_AVAILABLE})")
+    llm_available = is_llm_available()
+    logger.debug(f"Parsing {len(images_base64)} images (LLM_AVAILABLE={llm_available})")
     start_time = time.time()
+    
+    if not llm_available:
+        logger.error("Cannot parse images: LLM service unavailable (OPENAI_API_KEY not configured)")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="图片解析服务暂不可用，请联系管理员配置 OpenAI API Key",
+        )
     
     all_events = []
     
-    if LLM_AVAILABLE:
-        try:
-            from services.llm_service import parse_images_with_llm
-            # 尝试批量处理
-            events = parse_images_with_llm(images_base64, additional_note)
-            if events:
-                elapsed = time.time() - start_time
-                logger.info(f"LLM batch parsed {len(events)} event(s) from {len(images_base64)} image(s) in {elapsed:.2f}s")
-                
-                # 为每个事件生成并附加缩略图（使用第一张图片的缩略图，或可以改进为关联到对应图片）
-                # 注意：批量处理时，LLM 可能无法准确关联事件到具体图片，这里使用第一张图片的缩略图
-                if images_base64:
-                    thumbnail = generate_thumbnail(images_base64[0])
-                    for event in events:
-                        event.source_thumbnail = thumbnail
-                
-                return events
-        except Exception as e:
-            logger.warning(f"Batch parsing failed, falling back to individual parsing: {e}")
+    try:
+        from services.llm_service import parse_images_with_llm
+        # 尝试批量处理
+        events = parse_images_with_llm(images_base64, additional_note)
+        if events:
+            elapsed = time.time() - start_time
+            logger.info(f"LLM batch parsed {len(events)} event(s) from {len(images_base64)} image(s) in {elapsed:.2f}s")
+            
+            # 为每个事件生成并附加缩略图（使用第一张图片的缩略图）
+            if images_base64:
+                thumbnail = generate_thumbnail(images_base64[0])
+                for event in events:
+                    event.source_thumbnail = thumbnail
+            
+            return events
+        else:
+            logger.warning("LLM batch returned no events, trying individual parsing")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Batch parsing failed, falling back to individual parsing: {e}")
     
     # Fallback: 逐个处理每张图片
     logger.debug("Using individual image parsing (fallback)")
