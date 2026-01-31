@@ -2,7 +2,7 @@
 数据库模型 - SQLAlchemy ORM
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -19,6 +19,7 @@ class User(Base):
 
     # 关系
     events = relationship("Event", back_populates="user", cascade="all, delete-orphan")
+    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
 
 
 class Event(Base):
@@ -38,6 +39,7 @@ class Event(Base):
     # 来源信息
     source_type = Column(String(50), default="manual", nullable=False)  # text/image/voice/manual
     source_content = Column(Text, nullable=True)  # 原始输入内容
+    source_thumbnail = Column(Text, nullable=True)  # 图片来源的缩略图（base64 编码，约 200x200）
     
     # 状态
     is_followed = Column(Boolean, default=False, nullable=False, index=True)
@@ -47,3 +49,22 @@ class Event(Base):
 
     # 关系
     user = relationship("User", back_populates="events")
+
+
+class Conversation(Base):
+    """对话模型 - 存储用户与 Agent 的对话历史"""
+    __tablename__ = "conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(100), unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    
+    # 对话历史（JSON 格式存储消息列表）
+    messages = Column(JSON, default=list, nullable=False)
+    
+    # 时间戳
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # 关系
+    user = relationship("User", back_populates="conversations")

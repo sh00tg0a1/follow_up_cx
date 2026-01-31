@@ -7,7 +7,7 @@ API Routers
 from fastapi import APIRouter
 
 # 导入 API 路由
-from . import auth, users, parse, events
+from . import auth, users, parse, events, chat
 
 # 创建 API 路由器
 api_router = APIRouter(prefix="/api", tags=["API"])
@@ -17,3 +17,4 @@ api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(parse.router)
 api_router.include_router(events.router)
+api_router.include_router(chat.router)

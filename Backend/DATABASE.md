@@ -55,17 +55,51 @@ python init_db.py
 
 ## 配置
 
-数据库 URL 在 `config.py` 中配置：
+数据库 URL 在 `config.py` 中配置，支持通过环境变量覆盖。
 
-```python
-DATABASE_URL = "sqlite:///./followup.db"  # SQLite（本地）
-# DATABASE_URL = "postgresql://..."      # PostgreSQL（生产）
-```
+### 开发环境 (SQLite)
 
-可以通过环境变量覆盖：
+默认使用 SQLite，无需额外配置：
 
 ```bash
+# 使用默认配置
+uv run uvicorn main:app --reload
+
+# 或显式设置
 export DATABASE_URL="sqlite:///./followup.db"
+```
+
+### 生产环境 (PostgreSQL)
+
+通过环境变量 `DATABASE_URL` 配置 PostgreSQL 连接：
+
+```bash
+# PostgreSQL 连接格式
+export DATABASE_URL="postgresql://用户名:密码@主机:端口/数据库名"
+
+# 示例
+export DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/followup"
+
+# Railway/Heroku 等平台通常会自动注入 DATABASE_URL
+```
+
+**PostgreSQL 连接池配置**（已内置优化）：
+- `pool_size`: 5 - 基础连接池大小
+- `max_overflow`: 10 - 最大额外连接数
+- `pool_timeout`: 30s - 获取连接超时
+- `pool_recycle`: 1800s - 连接回收时间
+- `pool_pre_ping`: True - 使用前检测连接有效性
+
+### 环境变量示例
+
+```bash
+# .env 文件（开发）
+DATABASE_URL=sqlite:///./followup.db
+OPENAI_API_KEY=sk-xxx
+
+# 生产环境变量
+DATABASE_URL=postgresql://user:pass@db.example.com:5432/followup
+OPENAI_API_KEY=sk-xxx
 ```
 
 ## 使用数据库会话

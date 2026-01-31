@@ -1,5 +1,14 @@
 """
 配置管理
+
+环境变量配置:
+    DATABASE_URL: 数据库连接字符串
+        - 开发环境 (SQLite): sqlite:///./followup.db
+        - 生产环境 (PostgreSQL): postgresql://user:password@host:port/database
+        - 示例: DATABASE_URL=postgresql://postgres:mypassword@db.example.com:5432/followup
+    
+    OPENAI_API_KEY: OpenAI API 密钥
+    OPENAI_MODEL: 使用的模型名称 (默认: gpt-4o-mini)
 """
 import os
 from pathlib import Path
@@ -10,7 +19,8 @@ class Settings(BaseSettings):
     """应用配置"""
     
     # 数据库配置
-    # 测试环境使用内存数据库，生产环境使用文件数据库
+    # 开发环境默认使用 SQLite，生产环境通过环境变量设置 PostgreSQL
+    # PostgreSQL 格式: postgresql://user:password@host:port/database
     DATABASE_URL: str = "sqlite:///./followup.db"
     
     # OpenAI API 配置

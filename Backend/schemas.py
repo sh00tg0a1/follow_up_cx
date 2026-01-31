@@ -47,6 +47,7 @@ class ParsedEvent(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     source_type: str
+    source_thumbnail: Optional[str] = None  # 图片来源的缩略图（base64）
     is_followed: bool = False
 
 
@@ -66,6 +67,7 @@ class EventCreate(BaseModel):
     location: Optional[str] = Field(None, max_length=500)
     description: Optional[str] = None
     source_type: Optional[str] = Field("manual", max_length=50)
+    source_thumbnail: Optional[str] = Field(None, description="图片来源的缩略图（base64）")
     is_followed: bool = True
 
 
@@ -88,6 +90,7 @@ class EventResponse(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     source_type: Optional[str] = None
+    source_thumbnail: Optional[str] = None  # 图片来源的缩略图（base64）
     is_followed: bool = False
     created_at: datetime
 
@@ -95,6 +98,30 @@ class EventResponse(BaseModel):
 class EventListResponse(BaseModel):
     """活动列表响应"""
     events: List[EventResponse]
+
+
+# ============ 智能对话相关 ============
+
+class ChatRequest(BaseModel):
+    """智能对话请求"""
+    message: str = Field(..., min_length=1, description="用户消息")
+    image_base64: Optional[str] = Field(None, description="可选的图片 base64 编码")
+    session_id: Optional[str] = Field(None, description="会话ID，用于维护对话上下文")
+
+
+class ChatResponse(BaseModel):
+    """智能对话响应"""
+    message: str = Field(..., description="Agent 回复消息")
+    intent: str = Field(..., description="识别的意图: chat/create_event/update_event/delete_event/reject")
+    session_id: str = Field(..., description="会话ID")
+    action_result: Optional[dict] = Field(None, description="操作结果（如创建的日程详情）")
+
+
+class ConversationMessage(BaseModel):
+    """对话消息"""
+    role: Literal["user", "assistant"] = Field(..., description="消息角色")
+    content: str = Field(..., description="消息内容")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="消息时间")
 
 
 # ============ 通用 ============

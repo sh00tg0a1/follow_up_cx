@@ -4,6 +4,13 @@ Pytest 配置和共享 fixtures
 测试使用独立的内存数据库，完全隔离生产数据库
 """
 import os
+from pathlib import Path
+
+# 加载 .env 文件（在设置其他环境变量之前）
+from dotenv import load_dotenv
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
