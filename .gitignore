@@ -54,3 +54,6 @@ credentials.json
 *.class
 *.o
 *.exe
+
+# DB
+Backend/followup.db

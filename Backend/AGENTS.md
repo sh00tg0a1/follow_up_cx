@@ -45,9 +45,10 @@ Backend/
 │       ├── users.py
 │       ├── parse.py
 │       └── events.py
-├── services/            # TODO: create
-│   ├── llm_service.py   # LangChain integration
-│   └── ics_service.py   # ICS file generation
+├── services/            # Services layer
+│   ├── __init__.py
+│   ├── llm_service.py   # LangChain integration (✅ implemented)
+│   └── README.md        # LLM service documentation
 └── tests/               # TODO: create
     ├── test_auth.py
     ├── test_parse.py
@@ -108,12 +109,12 @@ uv run ruff check .
 
 ### Phase 1: Core (P0)
 
-- [ ] Database models (User, Event) with SQLAlchemy
-- [ ] User authentication with database
-- [ ] LangChain text parsing integration
-- [ ] OpenAI Vision image parsing
-- [ ] Events CRUD with database
-- [ ] ICS file generation
+- [x] Database models (User, Event) with SQLAlchemy
+- [x] User authentication with database
+- [x] LangChain text parsing integration
+- [x] OpenAI Vision image parsing
+- [x] Events CRUD with database
+- [x] ICS file generation
 
 ### Phase 2: Enhanced (P1)
 

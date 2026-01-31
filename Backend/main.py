@@ -15,11 +15,34 @@ from fastapi.responses import FileResponse
 # 导入路由
 from routers import api_router, mock_router
 
+# 初始化数据库
+from database import init_db
+from init_db import init_users, init_sample_events
+from database import SessionLocal
+
 app = FastAPI(
     title="FollowUP API",
     description="智能日程助手 - 从任意输入智能提取日程",
     version="0.1.0"
 )
+
+
+# 启动时初始化数据库
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化数据库"""
+    # 测试环境中跳过初始化（测试会自己管理数据库）
+    if os.getenv("TESTING") == "1":
+        return
+    
+    init_db()
+    db = SessionLocal()
+    try:
+        init_users(db)
+        # 可选：初始化示例活动
+        # init_sample_events(db)
+    finally:
+        db.close()
 
 # CORS 配置
 app.add_middleware(

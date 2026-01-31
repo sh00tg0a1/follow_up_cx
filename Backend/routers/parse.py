@@ -1,25 +1,34 @@
 """
 日程解析路由 - /api/parse
 
-使用固定 Token 认证
-TODO: 实现 LangChain + OpenAI 调用
+使用 LangChain + OpenAI 进行智能日程解析
 """
 import uuid
-import re
-from datetime import datetime, timedelta
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from schemas import ParseRequest, ParseResponse, ParsedEvent
 from auth import get_current_user
+from models import User
+
+# 尝试导入 LLM 服务，如果失败则使用 fallback
+try:
+    from services.llm_service import parse_text_with_llm, parse_image_with_llm
+    LLM_AVAILABLE = os.getenv("OPENAI_API_KEY") is not None
+except (ImportError, ValueError):
+    LLM_AVAILABLE = False
 
 router = APIRouter(tags=["日程解析"])
 
 
-def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
+def parse_text_fallback(text: str, additional_note: str = None) -> list[ParsedEvent]:
     """
-    解析文字内容
-    简单的关键词匹配（后续替换为 LangChain）
+    解析文字内容（Fallback - 简单关键词匹配）
+    当 LLM 不可用时使用
     """
+    import re
+    from datetime import datetime, timedelta
+    
     now = datetime.now()
     
     # 简单的时间关键词识别
@@ -72,11 +81,13 @@ def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
     )]
 
 
-def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEvent]:
+def parse_image_fallback(image_base64: str, additional_note: str = None) -> list[ParsedEvent]:
     """
-    解析图片内容
-    TODO: 实现 OpenAI Vision 调用
+    解析图片内容（Fallback - 模拟数据）
+    当 LLM 不可用时使用
     """
+    from datetime import datetime
+    
     now = datetime.now()
     next_month = now.month + 1 if now.month < 12 else 1
     next_year = now.year if now.month < 12 else now.year + 1
@@ -93,10 +104,38 @@ def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEv
     )]
 
 
+def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
+    """
+    解析文字内容
+    优先使用 LLM，失败时使用 fallback
+    """
+    if LLM_AVAILABLE:
+        events = parse_text_with_llm(text, additional_note)
+        if events:
+            return events
+    
+    # Fallback to simple parsing
+    return parse_text_fallback(text, additional_note)
+
+
+def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEvent]:
+    """
+    解析图片内容
+    优先使用 LLM Vision，失败时使用 fallback
+    """
+    if LLM_AVAILABLE:
+        events = parse_image_with_llm(image_base64, additional_note)
+        if events:
+            return events
+    
+    # Fallback to mock data
+    return parse_image_fallback(image_base64, additional_note)
+
+
 @router.post("/parse", response_model=ParseResponse)
 async def parse_event(
     request: ParseRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     解析日程信息
