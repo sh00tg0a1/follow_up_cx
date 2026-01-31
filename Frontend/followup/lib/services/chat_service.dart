@@ -80,6 +80,11 @@ class ChatService {
   /// Get current session ID
   static String? get sessionId => _sessionId;
 
+  /// Set initial session ID (e.g., username)
+  static void setSessionId(String sessionId) {
+    _sessionId = sessionId;
+  }
+
   /// Clear session (for new conversation)
   static void clearSession() {
     _sessionId = null;
@@ -88,6 +93,7 @@ class ChatService {
   /// Send message with streaming response
   static Stream<ChatEvent> sendMessageStream({
     required String message,
+    required String sessionId,
     String? imageBase64,
     List<String>? imagesBase64,
   }) async* {
@@ -102,9 +108,14 @@ class ChatService {
 
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/chat?stream=true');
     
+    // Use provided sessionId, fallback to stored _sessionId
+    final effectiveSessionId = sessionId.isNotEmpty ? sessionId : _sessionId;
+    
     final requestBody = <String, dynamic>{
       'message': message,
-      if (_sessionId != null) 'session_id': _sessionId,
+      // Only include session_id if it has a value
+      if (effectiveSessionId != null && effectiveSessionId.isNotEmpty)
+        'session_id': effectiveSessionId,
       if (imagesBase64 != null && imagesBase64.isNotEmpty)
         'images_base64': imagesBase64
       else if (imageBase64 != null)
@@ -173,6 +184,7 @@ class ChatService {
   /// Send message without streaming (for fallback)
   static Future<Map<String, dynamic>> sendMessage({
     required String message,
+    required String sessionId,
     String? imageBase64,
     List<String>? imagesBase64,
   }) async {
@@ -183,9 +195,14 @@ class ChatService {
 
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/chat');
     
+    // Use provided sessionId, fallback to stored _sessionId
+    final effectiveSessionId = sessionId.isNotEmpty ? sessionId : _sessionId;
+    
     final requestBody = <String, dynamic>{
       'message': message,
-      if (_sessionId != null) 'session_id': _sessionId,
+      // Only include session_id if it has a value
+      if (effectiveSessionId != null && effectiveSessionId.isNotEmpty)
+        'session_id': effectiveSessionId,
       if (imagesBase64 != null && imagesBase64.isNotEmpty)
         'images_base64': imagesBase64
       else if (imageBase64 != null)

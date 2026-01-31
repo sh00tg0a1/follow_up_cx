@@ -47,12 +47,16 @@ async def chat(
     
     需要认证：Authorization: Bearer <token>
     """
-    logger.info(f"Chat request from user {current_user.username}: {request.message[:50]}... (stream={stream})")
+    # 提前捕获 user_id，避免在 StreamingResponse 中访问 detached 的 User 对象
+    user_id = current_user.id
+    username = current_user.username
+    
+    logger.info(f"Chat request from user {username}: {request.message[:50]}... (stream={stream})")
     
     # 初始化对话记忆
     memory = ConversationMemory(
         db=db,
-        user_id=current_user.id,
+        user_id=user_id,
         session_id=request.session_id,
     )
     
@@ -86,7 +90,7 @@ async def chat(
                 
                 async for chunk in run_agent_stream(
                     message=request.message,
-                    user_id=current_user.id,
+                    user_id=user_id,
                     db=db,
                     image_base64=image_base64_for_agent,
                     images_base64=images_base64 if len(images_base64) > 1 else None,
@@ -131,7 +135,7 @@ async def chat(
         try:
             result = run_agent(
                 message=request.message,
-                user_id=current_user.id,
+                user_id=user_id,
                 db=db,
                 image_base64=image_base64_for_agent,
                 images_base64=images_base64 if len(images_base64) > 1 else None,
@@ -169,12 +173,15 @@ async def clear_conversation(
     
     需要认证：Authorization: Bearer <token>
     """
-    logger.info(f"Clear conversation request from user {current_user.username}: session_id={session_id}")
+    user_id = current_user.id
+    username = current_user.username
+    
+    logger.info(f"Clear conversation request from user {username}: session_id={session_id}")
     
     try:
         memory = ConversationMemory(
             db=db,
-            user_id=current_user.id,
+            user_id=user_id,
             session_id=session_id,
         )
         memory.clear()

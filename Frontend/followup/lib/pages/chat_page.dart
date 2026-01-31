@@ -58,6 +58,10 @@ class _ChatPageState extends State<ChatPage> {
     final text = _messageController.text.trim();
     if (text.isEmpty || _isTyping) return;
 
+    // Get username as session_id
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final username = authProvider.user?.username ?? 'anonymous';
+
     // Add user message
     setState(() {
       _messages.add(ChatMessage(
@@ -73,9 +77,10 @@ class _ChatPageState extends State<ChatPage> {
 
     _scrollToBottom();
 
-    // Start streaming
+    // Start streaming with username as session_id
     _streamSubscription = ChatService.sendMessageStream(
       message: text,
+      sessionId: username,
     ).listen(
       (event) {
         _handleChatEvent(event);
@@ -410,7 +415,7 @@ class _ChatPageState extends State<ChatPage> {
                         _TypingDot(delay: 300),
                       ],
                     )
-                  : Text(
+                  : SelectableText(
                       _currentResponse,
                       style: TextStyle(
                         color: AppColors.textPrimary,
@@ -586,7 +591,7 @@ class _ChatBubble extends StatelessWidget {
                       ),
                     ),
                   ],
-                  Text(
+                  SelectableText(
                     message.content,
                     style: TextStyle(
                       color: isUser 
