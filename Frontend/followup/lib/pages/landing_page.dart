@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
-// Landing Page - 产品介绍首页 (参照 v0 设计，优化视觉效果)
+// Landing Page
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
 
@@ -173,13 +174,14 @@ class _BrandColors {
   static const Color textSecondary = Color(0xFF6B7280); // Gray-500
 }
 
-// 导航栏 - 浮动毛玻璃效果
+// Navigation Bar
 class _NavBar extends StatelessWidget {
   const _NavBar();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 800;
 
@@ -241,11 +243,11 @@ class _NavBar extends StatelessWidget {
           if (isWide)
             Row(
               children: [
-                _NavLink(label: '使用流程', onTap: () {}),
+                _NavLink(label: l10n.howItWorksTitle, onTap: () {}),
                 const SizedBox(width: 8),
-                _NavLink(label: '功能特点', onTap: () {}),
+                _NavLink(label: l10n.featuresTitle, onTap: () {}),
                 const SizedBox(width: 8),
-                _NavLink(label: '价格方案', onTap: () {}),
+                _NavLink(label: l10n.pricingTitle, onTap: () {}),
                 const SizedBox(width: 24),
                 Container(
                   decoration: BoxDecoration(
@@ -257,11 +259,11 @@ class _NavBar extends StatelessWidget {
                     child: InkWell(
                       onTap: () => Navigator.pushNamed(context, '/login'),
                       borderRadius: BorderRadius.circular(24),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         child: Text(
-                          'Get Started',
-                          style: TextStyle(
+                          l10n.getStarted,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
@@ -283,6 +285,7 @@ class _NavBar extends StatelessWidget {
   }
 
   void _showMobileMenu(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -306,17 +309,17 @@ class _NavBar extends StatelessWidget {
             const SizedBox(height: 24),
             _MobileMenuItem(
               icon: Icons.play_circle_outline,
-              label: '使用流程',
+              label: l10n.howItWorksTitle,
               onTap: () => Navigator.pop(context),
             ),
             _MobileMenuItem(
               icon: Icons.star_outline,
-              label: '功能特点',
+              label: l10n.featuresTitle,
               onTap: () => Navigator.pop(context),
             ),
             _MobileMenuItem(
               icon: Icons.diamond_outlined,
-              label: '价格方案',
+              label: l10n.pricingTitle,
               onTap: () => Navigator.pop(context),
             ),
             const SizedBox(height: 24),
@@ -335,12 +338,12 @@ class _NavBar extends StatelessWidget {
                       Navigator.pushNamed(context, '/login');
                     },
                     borderRadius: BorderRadius.circular(24),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       child: Center(
                         child: Text(
-                          'Get Started',
-                          style: TextStyle(
+                          l10n.getStarted,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -494,11 +497,12 @@ class _HeroContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: isWide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
-        // AI 标签
+        // AI Tag
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -525,9 +529,9 @@ class _HeroContent extends StatelessWidget {
                 child: const Icon(Icons.auto_awesome, color: Colors.white, size: 12),
               ),
               const SizedBox(width: 8),
-              const Text(
-                '你的 AI 日历助手',
-                style: TextStyle(
+              Text(
+                l10n.footerTagline,
+                style: const TextStyle(
                   color: _BrandColors.primary,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
@@ -537,13 +541,13 @@ class _HeroContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 28),
-        // 主标题 - Teal 渐变
+        // Main Title
         ShaderMask(
           shaderCallback: (bounds) => const LinearGradient(
             colors: [_BrandColors.textPrimary, _BrandColors.primary, _BrandColors.primaryLight],
           ).createShader(bounds),
           child: Text(
-            '不再错过\n每一个重要时刻',
+            l10n.landingHeroTitle,
             textAlign: isWide ? TextAlign.left : TextAlign.center,
             style: (isWide ? theme.textTheme.displaySmall : theme.textTheme.headlineLarge)?.copyWith(
               fontWeight: FontWeight.w900,
@@ -554,9 +558,9 @@ class _HeroContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        // 副标题
+        // Subtitle
         Text(
-          'FollowUP 将照片、文字或语音转换为日历事件，\n让你不再为日程烦恼，专注于真正重要的事情。',
+          l10n.landingHeroSubtitle,
           textAlign: isWide ? TextAlign.left : TextAlign.center,
           style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -565,13 +569,13 @@ class _HeroContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 36),
-        // CTA 按钮组 - Deep Teal
+        // CTA Buttons
         Wrap(
           spacing: 16,
           runSpacing: 12,
           alignment: isWide ? WrapAlignment.start : WrapAlignment.center,
           children: [
-            // 主按钮 - 深青绿实心
+            // Primary Button
             Container(
               decoration: BoxDecoration(
                 color: _BrandColors.primary,
@@ -582,11 +586,11 @@ class _HeroContent extends StatelessWidget {
                 child: InkWell(
                   onTap: () => Navigator.pushNamed(context, '/login'),
                   borderRadius: BorderRadius.circular(24),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
                     child: Text(
-                      'Try the Demo',
-                      style: TextStyle(
+                      l10n.tryNow,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
@@ -596,7 +600,7 @@ class _HeroContent extends StatelessWidget {
                 ),
               ),
             ),
-            // 次按钮 - 透明边框
+            // Secondary Button
             Container(
               decoration: BoxDecoration(
                 color: Colors.transparent,
@@ -611,11 +615,11 @@ class _HeroContent extends StatelessWidget {
                 child: InkWell(
                   onTap: () {},
                   borderRadius: BorderRadius.circular(24),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
                     child: Text(
-                      'See how it works',
-                      style: TextStyle(
+                      l10n.learnMore,
+                      style: const TextStyle(
                         color: _BrandColors.primary,
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
@@ -628,15 +632,15 @@ class _HeroContent extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 32),
-        // 信任指标
+        // Trust Badges
         Wrap(
           spacing: 24,
           runSpacing: 12,
           alignment: isWide ? WrapAlignment.start : WrapAlignment.center,
           children: [
-            _TrustBadge(icon: Icons.lock_outline, text: '隐私优先'),
-            _TrustBadge(icon: Icons.flash_on, text: '30秒完成'),
-            _TrustBadge(icon: Icons.credit_card_off_outlined, text: '免费开始'),
+            _TrustBadge(icon: Icons.lock_outline, text: l10n.pricingFreeFeature1),
+            _TrustBadge(icon: Icons.flash_on, text: l10n.pricingFreeFeature2),
+            _TrustBadge(icon: Icons.credit_card_off_outlined, text: l10n.pricingFree),
           ],
         ),
       ],
@@ -703,131 +707,136 @@ class _HeroImage extends StatelessWidget {
               color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
             ),
           ),
-          child: Column(
-            children: [
-              // 输入类型选择
-              Row(
+          child: Builder(
+            builder: (context) {
+              final l10n = AppLocalizations.of(context)!;
+              return Column(
                 children: [
-                  _InputTypeChip(icon: Icons.photo_outlined, label: '图片', isSelected: true),
-                  const SizedBox(width: 10),
-                  _InputTypeChip(icon: Icons.text_fields, label: '文字', isSelected: false),
-                  const SizedBox(width: 10),
-                  _InputTypeChip(icon: Icons.mic_none, label: '语音', isSelected: false),
-                ],
-              ),
-              const SizedBox(height: 24),
-              // 事件预览卡片
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      _BrandColors.primary.withValues(alpha: 0.08),
-                      _BrandColors.accent.withValues(alpha: 0.05),
+                  // Input type selector
+                  Row(
+                    children: [
+                      _InputTypeChip(icon: Icons.photo_outlined, label: l10n.demoImageTab, isSelected: true),
+                      const SizedBox(width: 10),
+                      _InputTypeChip(icon: Icons.text_fields, label: l10n.demoTextTab, isSelected: false),
+                      const SizedBox(width: 10),
+                      _InputTypeChip(icon: Icons.mic_none, label: l10n.demoVoiceTab, isSelected: false),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _BrandColors.primary.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                  const SizedBox(height: 24),
+                  // Event preview card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          _BrandColors.primary.withValues(alpha: 0.08),
+                          _BrandColors.accent.withValues(alpha: 0.05),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _BrandColors.primary.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _BrandColors.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.event, color: Colors.white, size: 18),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '团队晚餐',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: _BrandColors.primary,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.event, color: Colors.white, size: 18),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l10n.demoTeamDinner,
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    l10n.demoNextFriday,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: _BrandColors.primary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _BrandColors.success.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                l10n.demoRecognized,
+                                style: const TextStyle(
+                                  color: _BrandColors.success,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        const _EventDetailRow(icon: Icons.access_time, text: '19:00 - 21:00'),
+                        const SizedBox(height: 10),
+                        _EventDetailRow(icon: Icons.location_on_outlined, text: l10n.demoRestaurant),
+                        const SizedBox(height: 10),
+                        _EventDetailRow(icon: Icons.note_outlined, text: l10n.demoBirthdayCard),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Add button
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: _BrandColors.primary,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {},
+                        borderRadius: BorderRadius.circular(24),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.calendar_today_rounded, color: Colors.white, size: 18),
+                              const SizedBox(width: 8),
                               Text(
-                                '下周五',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: _BrandColors.primary,
-                                  fontWeight: FontWeight.w500,
+                                l10n.demoAddToCalendar,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _BrandColors.success.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            '已识别',
-                            style: TextStyle(
-                              color: _BrandColors.success,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _EventDetailRow(icon: Icons.access_time, text: '19:00 - 21:00'),
-                    const SizedBox(height: 10),
-                    _EventDetailRow(icon: Icons.location_on_outlined, text: '橄榄园餐厅 · 主街店'),
-                    const SizedBox(height: 10),
-                    _EventDetailRow(icon: Icons.note_outlined, text: '记得带 Sarah 的生日卡'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              // 添加按钮 - Deep Teal
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: _BrandColors.primary,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {},
-                    borderRadius: BorderRadius.circular(24),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.calendar_today_rounded, color: Colors.white, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            'Add to Calendar',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -908,21 +917,22 @@ class _EventDetailRow extends StatelessWidget {
   }
 }
 
-// 痛点区域
+// Pain Points Section
 class _PainPointsSection extends StatelessWidget {
   const _PainPointsSection();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 800;
 
     final painPoints = [
-      _PainPoint(icon: Icons.photo_library_outlined, title: '活动海报截图', color: const Color(0xFFEC4899)),
-      _PainPoint(icon: Icons.chat_bubble_outline, title: '消息中的日期', color: const Color(0xFFF59E0B)),
-      _PainPoint(icon: Icons.insert_invitation_outlined, title: '传单和邀请函', color: const Color(0xFF8B5CF6)),
-      _PainPoint(icon: Icons.record_voice_over_outlined, title: '语音备忘录', color: const Color(0xFF06B6D4)),
+      _PainPoint(icon: Icons.photo_library_outlined, title: l10n.painPointPhoto, color: const Color(0xFFEC4899)),
+      _PainPoint(icon: Icons.chat_bubble_outline, title: l10n.painPointMessage, color: const Color(0xFFF59E0B)),
+      _PainPoint(icon: Icons.insert_invitation_outlined, title: l10n.painPointFlyer, color: const Color(0xFF8B5CF6)),
+      _PainPoint(icon: Icons.record_voice_over_outlined, title: l10n.painPointVoice, color: const Color(0xFF06B6D4)),
     ];
 
     return Container(
@@ -933,16 +943,16 @@ class _PainPointsSection extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // 标题
+          // Title
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: _BrandColors.warning.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Text(
-              '问题所在',
-              style: TextStyle(
+            child: Text(
+              l10n.theProblem,
+              style: const TextStyle(
                 color: _BrandColors.warning,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -951,7 +961,7 @@ class _PainPointsSection extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            '生活中的事件来得太快',
+            l10n.painPointsSubtitle,
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
@@ -962,7 +972,7 @@ class _PainPointsSection extends StatelessWidget {
           Container(
             constraints: const BoxConstraints(maxWidth: 600),
             child: Text(
-              '重要日期以截图、海报、消息或语音备忘的形式出现。\n手动添加到日历？既繁琐又容易遗忘。',
+              l10n.painPointsDesc,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.7,
@@ -971,7 +981,7 @@ class _PainPointsSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 48),
-          // 痛点卡片网格
+          // Pain point cards
           Wrap(
             spacing: 20,
             runSpacing: 20,
@@ -979,7 +989,7 @@ class _PainPointsSection extends StatelessWidget {
             children: painPoints.map((p) => _PainPointCard(painPoint: p, isWide: isWide)).toList(),
           ),
           const SizedBox(height: 48),
-          // 解决方案提示
+          // Solution hint
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
             decoration: BoxDecoration(
@@ -1007,8 +1017,8 @@ class _PainPointsSection extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  '你需要一个更简单的方式',
-                  style: TextStyle(
+                  l10n.painPointNeedSimpler,
+                  style: const TextStyle(
                     color: _BrandColors.primary,
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
@@ -1107,42 +1117,42 @@ class _PainPointCardState extends State<_PainPointCard> {
   }
 }
 
-// 使用流程区域
+// How It Works Section
 class _HowItWorksSection extends StatelessWidget {
   const _HowItWorksSection();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 900;
 
     final steps = [
-      _Step(number: '1', title: '捕获', description: '拍照、输入或说话', icon: Icons.camera_alt_outlined, color: const Color(0xFF3B82F6)),
-      _Step(number: '2', title: '理解', description: 'AI 智能处理', icon: Icons.psychology_outlined, color: const Color(0xFF8B5CF6)),
-      _Step(number: '3', title: '确认', description: '查看并编辑', icon: Icons.check_circle_outline, color: const Color(0xFF10B981)),
-      _Step(number: '4', title: '完成', description: '添加到日历', icon: Icons.event_available_outlined, color: const Color(0xFFEC4899)),
+      _Step(number: '1', title: l10n.captureStep, description: l10n.captureStepDesc, icon: Icons.camera_alt_outlined, color: const Color(0xFF3B82F6)),
+      _Step(number: '2', title: l10n.understandStep, description: l10n.understandStepDesc, icon: Icons.psychology_outlined, color: const Color(0xFF8B5CF6)),
+      _Step(number: '3', title: l10n.confirmStep, description: l10n.confirmStepDesc, icon: Icons.check_circle_outline, color: const Color(0xFF10B981)),
+      _Step(number: '4', title: l10n.doneStep, description: l10n.doneStepDesc, icon: Icons.event_available_outlined, color: const Color(0xFFEC4899)),
     ];
 
     return Container(
       width: double.infinity,
-      // 透明背景，使用全局背景
       padding: EdgeInsets.symmetric(
         horizontal: isWide ? 80 : 24,
         vertical: 80,
       ),
       child: Column(
         children: [
-          // 标题
+          // Title
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: _BrandColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Text(
-              '使用流程',
-              style: TextStyle(
+            child: Text(
+              l10n.howItWorksTitle,
+              style: const TextStyle(
                 color: _BrandColors.primary,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -1151,7 +1161,7 @@ class _HowItWorksSection extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            '从捕获到日历的智能路径',
+            l10n.step1Title,
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
@@ -1160,7 +1170,7 @@ class _HowItWorksSection extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '无需手动输入，无需担心遗忘，只需捕获即可',
+            l10n.step1Desc,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -1385,33 +1395,34 @@ class _StepCardState extends State<_StepCard> {
   }
 }
 
-// 特色功能区域 (新增)
+// Features Section
 class _FeaturesSection extends StatelessWidget {
   const _FeaturesSection();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 900;
 
     final features = [
       _Feature(
         icon: Icons.lock_outline,
-        title: '隐私优先',
-        description: '无需强制注册账户，你的数据安全存储',
+        title: l10n.featurePrivacyTitle,
+        description: l10n.featurePrivacyDesc,
         color: const Color(0xFF10B981),
       ),
       _Feature(
         icon: Icons.psychology_outlined,
-        title: '智能识别',
-        description: 'AI 自动提取日期、时间、地点等关键信息',
+        title: l10n.featureSmartTitle,
+        description: l10n.featureSmartDesc,
         color: _BrandColors.primary,
       ),
       _Feature(
         icon: Icons.tune,
-        title: '完全掌控',
-        description: '确认前可随时编辑和修改识别结果',
+        title: l10n.featureControlTitle,
+        description: l10n.featureControlDesc,
         color: const Color(0xFFF59E0B),
       ),
     ];
@@ -1424,16 +1435,16 @@ class _FeaturesSection extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // 标题
+          // Title
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: _BrandColors.success.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Text(
-              '功能亮点',
-              style: TextStyle(
+            child: Text(
+              l10n.featuresTitle,
+              style: const TextStyle(
                 color: _BrandColors.success,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -1442,7 +1453,7 @@ class _FeaturesSection extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            '减少心理负担，更专注生活',
+            l10n.featureFocusSubtitle,
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
@@ -1453,7 +1464,7 @@ class _FeaturesSection extends StatelessWidget {
           Container(
             constraints: const BoxConstraints(maxWidth: 600),
             child: Text(
-              'FollowUP 悄悄管理你的日程，让你的心思专注于真正重要的事情',
+              l10n.featureFocusDesc,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.6,
@@ -1589,7 +1600,7 @@ class _FeatureCardState extends State<_FeatureCard> {
   }
 }
 
-// 演示区域
+// Demo Section
 class _DemoSection extends StatefulWidget {
   const _DemoSection();
 
@@ -1599,11 +1610,24 @@ class _DemoSection extends StatefulWidget {
 
 class _DemoSectionState extends State<_DemoSection> {
   int _selectedTab = 0;
-  final _textController = TextEditingController(
-    text: '团队晚餐，下周五晚上7点，在主街的橄榄园餐厅。别忘了带 Sarah 的生日卡！',
-  );
+  late TextEditingController _textController;
   bool _showResult = false;
   bool _isExtracting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final l10n = AppLocalizations.of(context)!;
+    if (_textController.text.isEmpty) {
+      _textController.text = 'Team dinner next Friday at 7pm at Olive Garden on Main Street. Don\'t forget to bring Sarah\'s birthday card!';
+    }
+  }
 
   @override
   void dispose() {
@@ -1623,23 +1647,23 @@ class _DemoSectionState extends State<_DemoSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 900;
 
     return Container(
       width: double.infinity,
-      // 透明背景，使用全局背景
       padding: EdgeInsets.symmetric(
         horizontal: isWide ? 80 : 24,
         vertical: 80,
       ),
       child: Column(
         children: [
-          // 标题
+          // Title
           const SizedBox.shrink(),
           const SizedBox(height: 20),
           Text(
-            'Try it yourself',
+            l10n.demoTitle,
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
@@ -1648,30 +1672,30 @@ class _DemoSectionState extends State<_DemoSection> {
           ),
           const SizedBox(height: 16),
           Text(
-            'See how FollowUP transforms messy input into clean calendar events.',
+            l10n.demoDesc,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: _BrandColors.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 48),
-          // 演示卡片
+          // Demo cards
           Container(
             constraints: const BoxConstraints(maxWidth: 900),
             child: isWide
                 ? Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: _buildInputSection(theme)),
+                      Expanded(child: _buildInputSection(theme, l10n)),
                       const SizedBox(width: 24),
-                      Expanded(child: _buildResultSection(theme)),
+                      Expanded(child: _buildResultSection(theme, l10n)),
                     ],
                   )
                 : Column(
                     children: [
-                      _buildInputSection(theme),
+                      _buildInputSection(theme, l10n),
                       const SizedBox(height: 24),
-                      _buildResultSection(theme),
+                      _buildResultSection(theme, l10n),
                     ],
                   ),
           ),
@@ -1680,7 +1704,7 @@ class _DemoSectionState extends State<_DemoSection> {
     );
   }
 
-  Widget _buildInputSection(ThemeData theme) {
+  Widget _buildInputSection(ThemeData theme, AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -1710,7 +1734,7 @@ class _DemoSectionState extends State<_DemoSection> {
               ),
               const SizedBox(width: 12),
               Text(
-                '输入',
+                l10n.demoInputLabel,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -1718,7 +1742,7 @@ class _DemoSectionState extends State<_DemoSection> {
             ],
           ),
           const SizedBox(height: 20),
-          // Tab 切换
+          // Tab switcher
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
@@ -1727,20 +1751,20 @@ class _DemoSectionState extends State<_DemoSection> {
             ),
             child: Row(
               children: [
-                Expanded(child: _DemoTab(label: '文字', icon: Icons.text_fields, isSelected: _selectedTab == 0, onTap: () => setState(() => _selectedTab = 0))),
-                Expanded(child: _DemoTab(label: '图片', icon: Icons.photo_outlined, isSelected: _selectedTab == 1, onTap: () => setState(() => _selectedTab = 1))),
-                Expanded(child: _DemoTab(label: '语音', icon: Icons.mic_none, isSelected: _selectedTab == 2, onTap: () => setState(() => _selectedTab = 2))),
+                Expanded(child: _DemoTab(label: l10n.demoTextTab, icon: Icons.text_fields, isSelected: _selectedTab == 0, onTap: () => setState(() => _selectedTab = 0))),
+                Expanded(child: _DemoTab(label: l10n.demoImageTab, icon: Icons.photo_outlined, isSelected: _selectedTab == 1, onTap: () => setState(() => _selectedTab = 1))),
+                Expanded(child: _DemoTab(label: l10n.demoVoiceTab, icon: Icons.mic_none, isSelected: _selectedTab == 2, onTap: () => setState(() => _selectedTab = 2))),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          // 输入区域
+          // Input area
           if (_selectedTab == 0)
             TextField(
               controller: _textController,
               maxLines: 5,
               decoration: InputDecoration(
-                hintText: '输入包含事件信息的文字...',
+                hintText: l10n.demoInputPlaceholder,
                 hintStyle: TextStyle(color: Colors.grey[400]),
                 filled: true,
                 fillColor: Colors.grey[50],
@@ -1778,7 +1802,7 @@ class _DemoSectionState extends State<_DemoSection> {
                       child: const Icon(Icons.add_photo_alternate_outlined, size: 32, color: _BrandColors.primary),
                     ),
                     const SizedBox(height: 12),
-                    Text('点击上传图片', style: TextStyle(color: Colors.grey[600])),
+                    Text(l10n.demoClickUpload, style: TextStyle(color: Colors.grey[600])),
                   ],
                 ),
               ),
@@ -1803,7 +1827,7 @@ class _DemoSectionState extends State<_DemoSection> {
                       child: const Icon(Icons.mic_outlined, size: 32, color: _BrandColors.primary),
                     ),
                     const SizedBox(height: 12),
-                    Text('点击开始录音', style: TextStyle(color: Colors.grey[600])),
+                    Text(l10n.demoClickRecord, style: TextStyle(color: Colors.grey[600])),
                   ],
                 ),
               ),
@@ -1858,7 +1882,7 @@ class _DemoSectionState extends State<_DemoSection> {
     );
   }
 
-  Widget _buildResultSection(ThemeData theme) {
+  Widget _buildResultSection(ThemeData theme, AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -1888,7 +1912,7 @@ class _DemoSectionState extends State<_DemoSection> {
               ),
               const SizedBox(width: 12),
               Text(
-                '事件预览',
+                l10n.demoEventPreview,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -1932,7 +1956,7 @@ class _DemoSectionState extends State<_DemoSection> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '团队晚餐',
+                              l10n.demoTeamDinner,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -1944,9 +1968,9 @@ class _DemoSectionState extends State<_DemoSection> {
                                 color: _BrandColors.success.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: const Text(
-                                '已成功识别',
-                                style: TextStyle(
+                              child: Text(
+                                l10n.demoRecognized,
+                                style: const TextStyle(
                                   color: _BrandColors.success,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -1959,11 +1983,11 @@ class _DemoSectionState extends State<_DemoSection> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _EventDetailRow(icon: Icons.access_time, text: '下周五 19:00'),
+                  _EventDetailRow(icon: Icons.access_time, text: l10n.demoNextFriday),
                   const SizedBox(height: 10),
-                  _EventDetailRow(icon: Icons.location_on_outlined, text: '主街橄榄园餐厅'),
+                  _EventDetailRow(icon: Icons.location_on_outlined, text: l10n.demoRestaurant),
                   const SizedBox(height: 10),
-                  _EventDetailRow(icon: Icons.note_outlined, text: '带 Sarah 的生日卡'),
+                  _EventDetailRow(icon: Icons.note_outlined, text: l10n.demoBirthdayCard),
                   const SizedBox(height: 20),
                   Container(
                     width: double.infinity,
@@ -2013,7 +2037,7 @@ class _DemoSectionState extends State<_DemoSection> {
                     Icon(Icons.calendar_today_outlined, size: 48, color: Colors.grey[300]),
                     const SizedBox(height: 16),
                     Text(
-                      '提取的事件将在这里显示',
+                      l10n.demoExtractedEvent,
                       style: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 15,
@@ -2475,40 +2499,33 @@ class _PricingCardState extends State<_PricingCard> {
   }
 }
 
-// FAQ 区域
+// FAQ Section
 class _FAQSection extends StatelessWidget {
   const _FAQSection();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 800;
 
     final faqs = [
       _FAQ(
-        question: 'FollowUP 如何提取事件信息？',
-        answer: 'FollowUP 使用先进的 AI 技术分析你的文字、图片或语音输入，自动识别日期、时间、地点和事件标题等关键信息，然后生成格式化的日历事件。',
+        question: l10n.faq1Question,
+        answer: l10n.faq1Answer,
       ),
       _FAQ(
-        question: '可以导出到哪些日历？',
-        answer: '你可以导出 ICS 文件，该格式兼容几乎所有主流日历应用，包括 Apple Calendar、Google Calendar、Outlook 等。专业版还支持直接同步到你的日历账户。',
+        question: l10n.faq2Question,
+        answer: l10n.faq2Answer,
       ),
       _FAQ(
-        question: '我的数据安全吗？',
-        answer: '我们非常重视隐私保护。你的数据在传输和存储时都经过加密，我们不会将你的信息分享给第三方。你可以随时删除你的数据。',
+        question: l10n.faq3Question,
+        answer: l10n.faq3Answer,
       ),
       _FAQ(
-        question: '需要创建账户吗？',
-        answer: '免费版不需要创建账户，你可以直接使用基本功能。如果需要同步和更多高级功能，建议注册账户。',
-      ),
-      _FAQ(
-        question: 'FollowUP 支持哪些语言？',
-        answer: '目前我们支持中文、英文、日文等多种语言的事件识别。我们正在不断扩展语言支持。',
-      ),
-      _FAQ(
-        question: '如果 AI 识别错误怎么办？',
-        answer: '在添加到日历之前，你可以查看并编辑所有识别的信息。如果有误，只需手动修改即可。我们的 AI 会不断学习改进。',
+        question: l10n.faq4Question,
+        answer: l10n.faq4Answer,
       ),
     ];
 
@@ -2526,9 +2543,9 @@ class _FAQSection extends StatelessWidget {
               color: const Color(0xFF06B6D4).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Text(
-              '常见问题',
-              style: TextStyle(
+            child: Text(
+              l10n.faqTitle,
+              style: const TextStyle(
                 color: Color(0xFF06B6D4),
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -2537,7 +2554,7 @@ class _FAQSection extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            '还有疑问？',
+            l10n.stillHaveQuestions,
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
@@ -2546,7 +2563,7 @@ class _FAQSection extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '关于 FollowUP 你需要知道的一切',
+            l10n.everythingYouNeed,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -2669,26 +2686,26 @@ class _FAQItemState extends State<_FAQItem> {
   }
 }
 
-// 页脚
+// Footer
 class _Footer extends StatelessWidget {
   const _Footer();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 800;
 
     return Container(
       width: double.infinity,
-      // 透明背景，使用全局背景
       padding: EdgeInsets.symmetric(
         horizontal: isWide ? 80 : 24,
         vertical: 56,
       ),
       child: Column(
         children: [
-          // CTA 区域 - 深青绿背景
+          // CTA Section
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(40),
@@ -2699,7 +2716,7 @@ class _Footer extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  'Ready to get started?',
+                  l10n.footerCTATitle,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -2708,7 +2725,7 @@ class _Footer extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Let FollowUP manage your schedule, free your mind.',
+                  l10n.footerCTASubtitle,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 16,
@@ -2726,11 +2743,11 @@ class _Footer extends StatelessWidget {
                     child: InkWell(
                       onTap: () => Navigator.pushNamed(context, '/login'),
                       borderRadius: BorderRadius.circular(24),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                         child: Text(
-                          'Start for Free',
-                          style: TextStyle(
+                          l10n.getStarted,
+                          style: const TextStyle(
                             color: _BrandColors.primary,
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -2744,7 +2761,7 @@ class _Footer extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 56),
-          // Logo 和描述
+          // Logo and description
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -2774,7 +2791,7 @@ class _Footer extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            '将生活中的瞬间转化为日历事件\n让你不再为记住事情而烦恼',
+            l10n.footerDescription,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               height: 1.6,
@@ -2784,20 +2801,20 @@ class _Footer extends StatelessWidget {
           const SizedBox(height: 32),
           Divider(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
           const SizedBox(height: 24),
-          // 底部链接
+          // Bottom links
           Wrap(
             spacing: 32,
             runSpacing: 12,
             alignment: WrapAlignment.center,
             children: [
-              _FooterLink(label: '隐私政策', onTap: () {}),
-              _FooterLink(label: '服务条款', onTap: () {}),
-              _FooterLink(label: '联系我们', onTap: () {}),
+              _FooterLink(label: l10n.footerPrivacy, onTap: () {}),
+              _FooterLink(label: l10n.footerTerms, onTap: () {}),
+              _FooterLink(label: l10n.footerContact, onTap: () {}),
             ],
           ),
           const SizedBox(height: 24),
           Text(
-            '© 2026 FollowUP. All rights reserved.',
+            l10n.footerCopyright,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
