@@ -786,8 +786,10 @@ async def run_agent_stream(
         
     Yields:
         流式事件字典，包含 type 和相应数据：
+        - {"type": "thinking", "message": "正在思考..."} - 思考中状态
         - {"type": "intent", "intent": "chat"} - 意图识别完成
-        - {"type": "token", "token": "字"} - 流式文本 token
+        - {"type": "token", "token": "字"} - 流式文本 token（仅 chat 意图）
+        - {"type": "content", "content": "完整回复"} - 完整回复（非 chat 意图）
         - {"type": "action", "action_result": {...}} - 操作结果（如创建的日程）
         - {"type": "done"} - 完成
         - {"type": "error", "error": "错误信息"} - 错误
@@ -795,6 +797,9 @@ async def run_agent_stream(
     logger.info(f"Running agent (streaming) for user {user_id}: {message[:50]}...")
     
     try:
+        # 发送 thinking 事件 - 开始理解请求
+        yield {"type": "thinking", "message": "正在理解您的请求..."}
+        
         initial_state = AgentState(
             message=message,
             image_base64=image_base64,
@@ -867,14 +872,24 @@ async def run_agent_stream(
         
         yield {"type": "intent", "intent": intent}
         
-        # 第二步：根据意图流式生成回复
+        # 第二步：根据意图生成回复
         if intent == "chat":
-            # 闲聊：流式生成回复
+            # 闲聊：发送 thinking 事件，然后流式生成回复
+            yield {"type": "thinking", "message": "正在思考回复..."}
             async for chunk in handle_chat_stream(initial_state):
                 yield chunk
         else:
-            # 其他意图（create_event/update_event/delete_event/reject）
-            # 先完整执行，然后流式输出回复文本
+            # 其他意图（create_event/query_event/update_event/delete_event/reject）
+            # 发送 thinking 事件，说明正在执行操作
+            thinking_messages = {
+                "create_event": "正在创建日程...",
+                "query_event": "正在查询日程...",
+                "update_event": "正在修改日程...",
+                "delete_event": "正在删除日程...",
+                "reject": "正在处理...",
+            }
+            yield {"type": "thinking", "message": thinking_messages.get(intent, "正在处理...")}
+            
             agent = create_agent_graph()
             result = agent.invoke(initial_state)
             
@@ -882,10 +897,10 @@ async def run_agent_stream(
             if result.get("action_result"):
                 yield {"type": "action", "action_result": result.get("action_result")}
             
-            # 流式输出回复文本（逐字符，模拟流式效果）
+            # 直接发送完整回复（非流式操作，直接返回结果更清晰）
             full_response = result.get("response", "")
-            for char in full_response:
-                yield {"type": "token", "token": char}
+            if full_response:
+                yield {"type": "content", "content": full_response}
         
         yield {"type": "done"}
         
