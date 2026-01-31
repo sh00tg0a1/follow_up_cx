@@ -653,6 +653,8 @@ def route_by_intent(state: AgentState) -> str:
     
     if intent == "create_event":
         return "create_event"
+    elif intent == "query_event":
+        return "query_event"
     elif intent == "update_event":
         return "update_event"
     elif intent == "delete_event":
@@ -677,6 +679,7 @@ def create_agent_graph() -> StateGraph:
     graph.add_node("intent_classifier", classify_intent)
     graph.add_node("chat", handle_chat)
     graph.add_node("create_event", handle_create_event)
+    graph.add_node("query_event", handle_query_event)
     graph.add_node("update_event", handle_update_event)
     graph.add_node("delete_event", handle_delete_event)
     graph.add_node("reject", handle_reject)
@@ -691,6 +694,7 @@ def create_agent_graph() -> StateGraph:
         {
             "chat": "chat",
             "create_event": "create_event",
+            "query_event": "query_event",
             "update_event": "update_event",
             "delete_event": "delete_event",
             "reject": "reject",
@@ -700,6 +704,7 @@ def create_agent_graph() -> StateGraph:
     # 所有处理节点都结束
     graph.add_edge("chat", END)
     graph.add_edge("create_event", END)
+    graph.add_edge("query_event", END)
     graph.add_edge("update_event", END)
     graph.add_edge("delete_event", END)
     graph.add_edge("reject", END)
