@@ -180,6 +180,95 @@ def parse_image_with_llm(
         return []
 
 
+def parse_images_with_llm(
+    images_base64: List[str],
+    additional_note: Optional[str] = None,
+) -> List[ParsedEvent]:
+    """
+    使用 LangChain + OpenAI Vision 批量解析多张图片中的日程信息
+    
+    Args:
+        images_base64: Base64 编码的图片列表
+        additional_note: 补充说明
+        
+    Returns:
+        解析出的事件列表（所有图片的事件合并）
+    """
+    if not images_base64:
+        return []
+    
+    start_time = time.time()
+    logger.debug(f"Starting LLM batch image parsing ({len(images_base64)} images)")
+    
+    all_events = []
+    
+    try:
+        llm = get_llm()
+        parser = JsonOutputParser(pydantic_object=EventExtractionList)
+        current_time = datetime.now().isoformat()
+        system_message = IMAGE_PARSE_SYSTEM_PROMPT.format(current_time=current_time)
+        
+        # 为每张图片构建多模态消息
+        user_content = []
+        
+        # 添加所有图片
+        for img_base64 in images_base64:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{img_base64}",
+                },
+            })
+        
+        # 添加文本说明
+        note_text = f"请分析以上 {len(images_base64)} 张图片，提取所有日程信息。"
+        if additional_note:
+            note_text += f"\n补充说明：{additional_note}"
+        user_content.append({
+            "type": "text",
+            "text": note_text,
+        })
+        
+        # 创建消息
+        messages = [
+            ("system", system_message),
+            HumanMessage(content=user_content),
+        ]
+        
+        logger.debug(f"Calling LLM Vision API with {len(images_base64)} images (model={settings.OPENAI_MODEL})")
+        
+        # 调用 LLM（支持多图片 Vision）
+        response = llm.invoke(messages)
+        
+        elapsed = time.time() - start_time
+        logger.info(f"LLM batch Vision API call completed in {elapsed:.2f}s")
+        
+        # 解析 JSON 响应
+        result = parser.parse(response.content)
+        
+        # 转换为 ParsedEvent
+        events = _convert_to_parsed_events(result, source_type="image")
+        
+        logger.info(f"LLM batch image parsing completed: {len(events)} event(s) extracted from {len(images_base64)} image(s)")
+        return events
+    
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"LLM batch image parsing failed after {elapsed:.2f}s: {e}", exc_info=True)
+        # 如果批量处理失败，尝试逐个处理
+        logger.info("Falling back to individual image parsing...")
+        for idx, img_base64 in enumerate(images_base64):
+            try:
+                events = parse_image_with_llm(img_base64, additional_note)
+                all_events.extend(events)
+                logger.debug(f"Parsed image {idx+1}/{len(images_base64)}: {len(events)} event(s)")
+            except Exception as img_error:
+                logger.warning(f"Failed to parse image {idx+1}: {img_error}")
+                continue
+        
+        return all_events
+
+
 # ============================================================================
 # Helper Functions
 # ============================================================================

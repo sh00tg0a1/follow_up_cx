@@ -34,7 +34,8 @@ class ParseRequest(BaseModel):
     """日程解析请求"""
     input_type: Literal["text", "image"] = Field(..., description="输入类型: text 或 image")
     text_content: Optional[str] = Field(None, description="文字内容")
-    image_base64: Optional[str] = Field(None, description="图片 base64 编码")
+    image_base64: Optional[str] = Field(None, description="单张图片 base64 编码（向后兼容）")
+    images_base64: Optional[List[str]] = Field(None, description="多张图片 base64 编码列表")
     additional_note: Optional[str] = Field(None, description="补充说明")
 
 
@@ -105,7 +106,8 @@ class EventListResponse(BaseModel):
 class ChatRequest(BaseModel):
     """智能对话请求"""
     message: str = Field(..., min_length=1, description="用户消息")
-    image_base64: Optional[str] = Field(None, description="可选的图片 base64 编码")
+    image_base64: Optional[str] = Field(None, description="可选的单张图片 base64 编码（向后兼容）")
+    images_base64: Optional[List[str]] = Field(None, description="可选的多张图片 base64 编码列表")
     session_id: Optional[str] = Field(None, description="会话ID，用于维护对话上下文")
 
 

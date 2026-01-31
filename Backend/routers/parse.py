@@ -2,10 +2,12 @@
 日程解析路由 - /api/parse
 
 使用 LangChain + OpenAI 进行智能日程解析
+支持单张或多张图片批量解析
 """
 import uuid
 import os
 import time
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from schemas import ParseRequest, ParseResponse, ParsedEvent
@@ -143,7 +145,7 @@ def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
 
 def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEvent]:
     """
-    解析图片内容
+    解析单张图片内容
     优先使用 LLM Vision，失败时使用 fallback
     同时生成缩略图附加到每个事件
     """
@@ -167,6 +169,53 @@ def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEv
     for event in events:
         event.source_thumbnail = thumbnail
     return events
+
+
+def parse_images(images_base64: List[str], additional_note: str = None) -> list[ParsedEvent]:
+    """
+    批量解析多张图片内容
+    优先使用 LLM Vision 批量处理，失败时逐个处理
+    为每张图片生成缩略图并附加到对应的事件
+    """
+    logger.debug(f"Parsing {len(images_base64)} images (LLM_AVAILABLE={LLM_AVAILABLE})")
+    start_time = time.time()
+    
+    all_events = []
+    
+    if LLM_AVAILABLE:
+        try:
+            from services.llm_service import parse_images_with_llm
+            # 尝试批量处理
+            events = parse_images_with_llm(images_base64, additional_note)
+            if events:
+                elapsed = time.time() - start_time
+                logger.info(f"LLM batch parsed {len(events)} event(s) from {len(images_base64)} image(s) in {elapsed:.2f}s")
+                
+                # 为每个事件生成并附加缩略图（使用第一张图片的缩略图，或可以改进为关联到对应图片）
+                # 注意：批量处理时，LLM 可能无法准确关联事件到具体图片，这里使用第一张图片的缩略图
+                if images_base64:
+                    thumbnail = generate_thumbnail(images_base64[0])
+                    for event in events:
+                        event.source_thumbnail = thumbnail
+                
+                return events
+        except Exception as e:
+            logger.warning(f"Batch parsing failed, falling back to individual parsing: {e}")
+    
+    # Fallback: 逐个处理每张图片
+    logger.debug("Using individual image parsing (fallback)")
+    for idx, image_base64 in enumerate(images_base64):
+        try:
+            events = parse_image(image_base64, additional_note)
+            all_events.extend(events)
+            logger.debug(f"Parsed image {idx+1}/{len(images_base64)}: {len(events)} event(s)")
+        except Exception as e:
+            logger.warning(f"Failed to parse image {idx+1}: {e}")
+            continue
+    
+    elapsed = time.time() - start_time
+    logger.info(f"Parsed {len(all_events)} total event(s) from {len(images_base64)} image(s) in {elapsed:.2f}s")
+    return all_events
 
 
 @router.post("/parse", response_model=ParseResponse)
@@ -199,13 +248,29 @@ async def parse_event(
         events = parse_text(request.text_content, request.additional_note)
     
     elif request.input_type == "image":
-        if not request.image_base64:
-            logger.warning(f"Parse failed: image_base64 is required")
+        # 支持单张或多张图片
+        images_to_parse = []
+        
+        # 优先使用 images_base64（多图片）
+        if request.images_base64:
+            images_to_parse = request.images_base64
+        # 向后兼容：支持单张图片 image_base64
+        elif request.image_base64:
+            images_to_parse = [request.image_base64]
+        else:
+            logger.warning(f"Parse failed: image_base64 or images_base64 is required")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="image_base64 is required for image input type",
+                detail="image_base64 or images_base64 is required for image input type",
             )
-        events = parse_image(request.image_base64, request.additional_note)
+        
+        # 处理多张图片
+        if len(images_to_parse) == 1:
+            # 单张图片：使用原有逻辑（包含缩略图生成）
+            events = parse_image(images_to_parse[0], request.additional_note)
+        else:
+            # 多张图片：批量处理
+            events = parse_images(images_to_parse, request.additional_note)
     
     else:
         logger.warning(f"Parse failed: invalid input_type={request.input_type}")
