@@ -16,6 +16,9 @@ from models import User
 
 def add_moni_user():
     """添加 moni 用户"""
+    # 确保数据库表存在
+    init_db()
+    
     db = SessionLocal()
     try:
         # 检查 moni 是否已存在
