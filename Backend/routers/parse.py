@@ -12,6 +12,7 @@ from schemas import ParseRequest, ParseResponse, ParsedEvent
 from auth import get_current_user
 from models import User
 from logging_config import get_logger
+from services.image_utils import generate_thumbnail
 
 logger = get_logger(__name__)
 
@@ -144,14 +145,28 @@ def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEv
     """
     解析图片内容
     优先使用 LLM Vision，失败时使用 fallback
+    同时生成缩略图附加到每个事件
     """
+    # 生成缩略图
+    thumbnail = generate_thumbnail(image_base64)
+    if thumbnail:
+        logger.debug(f"Generated thumbnail for image, size: {len(thumbnail)} chars")
+    
+    # 解析图片
     if LLM_AVAILABLE:
         events = parse_image_with_llm(image_base64, additional_note)
         if events:
+            # 为每个事件附加缩略图
+            for event in events:
+                event.source_thumbnail = thumbnail
             return events
     
     # Fallback to simple parsing
-    return parse_image_fallback(image_base64, additional_note)
+    events = parse_image_fallback(image_base64, additional_note)
+    # 为每个事件附加缩略图
+    for event in events:
+        event.source_thumbnail = thumbnail
+    return events
 
 
 @router.post("/parse", response_model=ParseResponse)

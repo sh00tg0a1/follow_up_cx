@@ -37,6 +37,7 @@ def event_to_response(event: Event) -> EventResponse:
         location=event.location,
         description=event.description,
         source_type=event.source_type,
+        source_thumbnail=event.source_thumbnail,
         is_followed=event.is_followed,
         created_at=event.created_at,
     )
@@ -87,6 +88,7 @@ async def create_event(
         location=request.location,
         description=request.description,
         source_type=request.source_type or "manual",
+        source_thumbnail=request.source_thumbnail,
         is_followed=request.is_followed,
     )
 

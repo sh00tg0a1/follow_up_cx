@@ -19,6 +19,7 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "python-dotenv>=1.0.0",
     "psycopg2-binary>=2.9.9",
+    "Pillow>=10.0.0",
 ]
 
 # [project.scripts] - 使用 uv run uvicorn main:app --reload 代替
