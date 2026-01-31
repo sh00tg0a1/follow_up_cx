@@ -1,42 +1,40 @@
 """
-JWT Authentication - 简单的 JWT 生成和验证
+Authentication - 简单的固定 Token 验证（开发用）
 """
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
 
-from mock_data import get_user_by_id
-
-# JWT 配置（Mock 用，硬编码）
-JWT_SECRET = "followup-mock-secret-key-for-development-only"
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_HOURS = 24
+from mock_data import get_user_by_username, USERS
 
 # Bearer Token 安全模式
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
+
+# 固定 Token 映射（用户名 -> token）
+# Token 格式：用户名 + "123"
+FIXED_TOKENS = {
+    "alice123": "alice",
+    "bob123": "bob",
+    "jane123": "jane",
+    "xiao123": "xiao",
+}
 
 
-def create_access_token(user_id: int, username: str) -> str:
-    """创建 JWT Token"""
-    expire = datetime.utcnow() + timedelta(hours=JWT_EXPIRE_HOURS)
-    payload = {
-        "sub": str(user_id),
-        "username": username,
-        "exp": expire,
-        "iat": datetime.utcnow(),
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-def decode_token(token: str) -> Optional[dict]:
-    """解码 JWT Token"""
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload
-    except JWTError:
-        return None
+def verify_token(token: str) -> Optional[dict]:
+    """
+    验证固定 Token
+    
+    支持的 Token：
+    - alice123 -> alice 用户
+    - bob123 -> bob 用户
+    - jane123 -> jane 用户
+    - xiao123 -> xiao 用户
+    """
+    username = FIXED_TOKENS.get(token)
+    if username:
+        return get_user_by_username(username)
+    return None
 
 
 async def get_current_user(
@@ -44,26 +42,39 @@ async def get_current_user(
 ) -> dict:
     """
     依赖注入：获取当前登录用户
-    用于需要认证的接口
-    """
-    token = credentials.credentials
-    payload = decode_token(token)
     
-    if payload is None:
+    使用固定 Token 验证：
+    - Authorization: Bearer alice123
+    - Authorization: Bearer bob123
+    """
+    if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            detail="Not authenticated. Use 'Authorization: Bearer alice123'",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user_id = int(payload.get("sub", 0))
-    user = get_user_by_id(user_id)
+    token = credentials.credentials
+    user = verify_token(token)
     
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="Invalid token. Valid tokens: alice123, bob123, jane123, xiao123",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
     return user
+
+
+async def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> Optional[dict]:
+    """
+    可选认证：如果提供了 Token 则验证，否则返回 None
+    """
+    if credentials is None:
+        return None
+    
+    token = credentials.credentials
+    return verify_token(token)

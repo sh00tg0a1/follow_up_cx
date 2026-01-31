@@ -1,10 +1,10 @@
 """
 Mock 活动路由 - /mock/events/*
 
-CRUD 操作 + ICS 文件生成（使用内存存储）
+无需认证，CRUD 操作 + ICS 文件生成（使用内存存储）
 """
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query
 from fastapi.responses import Response
 from icalendar import Calendar, Event as ICalEvent
 
@@ -14,7 +14,6 @@ from schemas import (
     EventResponse,
     EventListResponse,
 )
-from auth import get_current_user
 from mock_data import (
     get_events_by_user,
     add_event,
@@ -24,6 +23,9 @@ from mock_data import (
 )
 
 router = APIRouter(prefix="/events", tags=["Mock-活动管理"])
+
+# 默认用户 ID（无需登录）
+DEFAULT_USER_ID = 1
 
 
 def event_to_response(event: dict) -> EventResponse:
@@ -44,15 +46,13 @@ def event_to_response(event: dict) -> EventResponse:
 @router.get("", response_model=EventListResponse)
 async def list_events(
     followed_only: bool = Query(False, description="仅返回已 Follow 的活动"),
-    current_user: dict = Depends(get_current_user),
 ):
     """
     [Mock] 获取用户的活动列表
     
-    - followed_only: 设为 true 时只返回已 Follow 的活动
+    无需认证，返回默认用户的活动
     """
-    user_id = current_user["id"]
-    events = get_events_by_user(user_id, followed_only)
+    events = get_events_by_user(DEFAULT_USER_ID, followed_only)
     
     return EventListResponse(
         events=[event_to_response(e) for e in events]
@@ -60,15 +60,12 @@ async def list_events(
 
 
 @router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
-async def create_event(
-    request: EventCreate,
-    current_user: dict = Depends(get_current_user),
-):
+async def create_event(request: EventCreate):
     """
     [Mock] 创建新活动
-    """
-    user_id = current_user["id"]
     
+    无需认证
+    """
     event_data = {
         "title": request.title,
         "start_time": request.start_time,
@@ -79,20 +76,18 @@ async def create_event(
         "is_followed": request.is_followed,
     }
     
-    event = add_event(user_id, event_data)
+    event = add_event(DEFAULT_USER_ID, event_data)
     return event_to_response(event)
 
 
 @router.get("/{event_id}", response_model=EventResponse)
-async def get_event(
-    event_id: int,
-    current_user: dict = Depends(get_current_user),
-):
+async def get_event(event_id: int):
     """
     [Mock] 获取单个活动详情
+    
+    无需认证
     """
-    user_id = current_user["id"]
-    event = get_event_by_id(user_id, event_id)
+    event = get_event_by_id(DEFAULT_USER_ID, event_id)
     
     if event is None:
         raise HTTPException(
@@ -104,18 +99,14 @@ async def get_event(
 
 
 @router.put("/{event_id}", response_model=EventResponse)
-async def update_event_endpoint(
-    event_id: int,
-    request: EventUpdate,
-    current_user: dict = Depends(get_current_user),
-):
+async def update_event_endpoint(event_id: int, request: EventUpdate):
     """
     [Mock] 更新活动
-    """
-    user_id = current_user["id"]
     
+    无需认证
+    """
     # 检查活动是否存在
-    existing = get_event_by_id(user_id, event_id)
+    existing = get_event_by_id(DEFAULT_USER_ID, event_id)
     if existing is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -137,21 +128,18 @@ async def update_event_endpoint(
     if request.is_followed is not None:
         update_data["is_followed"] = request.is_followed
     
-    updated = update_event(user_id, event_id, update_data)
+    updated = update_event(DEFAULT_USER_ID, event_id, update_data)
     return event_to_response(updated)
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_event_endpoint(
-    event_id: int,
-    current_user: dict = Depends(get_current_user),
-):
+async def delete_event_endpoint(event_id: int):
     """
     [Mock] 删除活动
-    """
-    user_id = current_user["id"]
     
-    success = delete_event(user_id, event_id)
+    无需认证
+    """
+    success = delete_event(DEFAULT_USER_ID, event_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -162,17 +150,13 @@ async def delete_event_endpoint(
 
 
 @router.get("/{event_id}/ics")
-async def download_ics(
-    event_id: int,
-    current_user: dict = Depends(get_current_user),
-):
+async def download_ics(event_id: int):
     """
     [Mock] 下载活动的 ICS 文件
     
-    可直接导入到日历应用
+    无需认证，可直接导入到日历应用
     """
-    user_id = current_user["id"]
-    event = get_event_by_id(user_id, event_id)
+    event = get_event_by_id(DEFAULT_USER_ID, event_id)
     
     if event is None:
         raise HTTPException(

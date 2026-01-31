@@ -1,15 +1,14 @@
 """
 Mock 日程解析路由 - /mock/parse
 
-Mock 实现：不调用真实 LLM，返回模拟数据
+无需认证，返回模拟数据
 """
 import uuid
 import re
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
 from schemas import ParseRequest, ParseResponse, ParsedEvent
-from auth import get_current_user
 
 router = APIRouter(tags=["Mock-日程解析"])
 
@@ -114,18 +113,13 @@ def mock_parse_image(image_base64: str, additional_note: str = None) -> list[Par
 
 
 @router.post("/parse", response_model=ParseResponse)
-async def parse_event(
-    request: ParseRequest,
-    current_user: dict = Depends(get_current_user)
-):
+async def parse_event(request: ParseRequest):
     """
     [Mock] 解析日程信息
     
-    支持文字和图片两种输入类型：
+    无需认证，支持文字和图片两种输入类型：
     - text: 从文字描述中提取日程
     - image: 从图片（海报等）中识别日程
-    
-    Mock 实现：返回模拟数据，不调用真实 LLM
     """
     if request.input_type == "text":
         if not request.text_content:

@@ -1,9 +1,9 @@
 """
 用户路由 - /api/user/*
 
-TODO: 实现真实的数据库查询
+使用固定 Token 认证
 """
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Depends
 
 from schemas import UserResponse
 from auth import get_current_user
@@ -18,10 +18,10 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     
     需要在 Header 中携带 Authorization: Bearer <token>
     
-    TODO: 实现真实的数据库查询
+    示例：Authorization: Bearer alice123
     """
-    # TODO: 从数据库查询用户详细信息
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="API not implemented yet. Use /mock/user/me for development.",
+    return UserResponse(
+        id=current_user["id"],
+        username=current_user["username"],
+        created_at=current_user["created_at"],
     )

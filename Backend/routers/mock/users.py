@@ -1,23 +1,32 @@
 """
 Mock 用户路由 - /mock/user/*
+
+无需认证，直接返回默认用户
 """
-from fastapi import APIRouter, Depends
+from datetime import datetime
+from fastapi import APIRouter
 
 from schemas import UserResponse
-from auth import get_current_user
 
 router = APIRouter(prefix="/user", tags=["Mock-用户"])
 
+# 默认用户（无需登录）
+DEFAULT_USER = {
+    "id": 1,
+    "username": "alice",
+    "created_at": datetime(2026, 1, 1, 10, 0, 0),
+}
+
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+async def get_current_user_info():
     """
-    [Mock] 获取当前登录用户信息
+    [Mock] 获取当前用户信息
     
-    需要在 Header 中携带 Authorization: Bearer <token>
+    无需认证，返回默认用户 alice
     """
     return UserResponse(
-        id=current_user["id"],
-        username=current_user["username"],
-        created_at=current_user["created_at"],
+        id=DEFAULT_USER["id"],
+        username=DEFAULT_USER["username"],
+        created_at=DEFAULT_USER["created_at"],
     )

@@ -1,14 +1,96 @@
 """
 日程解析路由 - /api/parse
 
-TODO: 实现真实的 LangChain + OpenAI 调用
+使用固定 Token 认证
+TODO: 实现 LangChain + OpenAI 调用
 """
+import uuid
+import re
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from schemas import ParseRequest, ParseResponse
+from schemas import ParseRequest, ParseResponse, ParsedEvent
 from auth import get_current_user
 
 router = APIRouter(tags=["日程解析"])
+
+
+def parse_text(text: str, additional_note: str = None) -> list[ParsedEvent]:
+    """
+    解析文字内容
+    简单的关键词匹配（后续替换为 LangChain）
+    """
+    now = datetime.now()
+    
+    # 简单的时间关键词识别
+    if "明天" in text:
+        event_date = now + timedelta(days=1)
+    elif "后天" in text:
+        event_date = now + timedelta(days=2)
+    elif "下周" in text:
+        event_date = now + timedelta(days=7)
+    else:
+        event_date = now + timedelta(days=3)
+    
+    # 简单的时间点识别
+    hour = 14
+    if "上午" in text or "早上" in text:
+        hour = 10
+    elif "下午" in text:
+        hour = 14
+    elif "晚上" in text:
+        hour = 19
+    
+    # 尝试提取具体时间
+    time_match = re.search(r'(\d{1,2})[点时]', text)
+    if time_match:
+        hour = int(time_match.group(1))
+        if hour < 12 and ("下午" in text or "晚上" in text):
+            hour += 12
+    
+    start_time = event_date.replace(hour=hour, minute=0, second=0, microsecond=0)
+    
+    # 提取标题
+    title = "会议"
+    keywords = {"开会": "会议", "聚餐": "聚餐", "吃饭": "聚餐", "音乐会": "音乐会", "演出": "演出", "面试": "面试", "约会": "约会"}
+    for kw, t in keywords.items():
+        if kw in text:
+            title = t
+            break
+    else:
+        title = text[:10].strip() if len(text) > 10 else text.strip()
+    
+    return [ParsedEvent(
+        id=None,
+        title=title,
+        start_time=start_time,
+        end_time=None,
+        location=additional_note,
+        description=text,
+        source_type="text",
+        is_followed=False,
+    )]
+
+
+def parse_image(image_base64: str, additional_note: str = None) -> list[ParsedEvent]:
+    """
+    解析图片内容
+    TODO: 实现 OpenAI Vision 调用
+    """
+    now = datetime.now()
+    next_month = now.month + 1 if now.month < 12 else 1
+    next_year = now.year if now.month < 12 else now.year + 1
+    
+    return [ParsedEvent(
+        id=None,
+        title="汉堡爱乐乐团音乐会",
+        start_time=datetime(next_year, next_month, 15, 19, 30),
+        end_time=datetime(next_year, next_month, 15, 22, 0),
+        location="Elbphilharmonie, Hamburg",
+        description="贝多芬第九交响曲\n指挥：Alan Gilbert\n\n" + (additional_note or ""),
+        source_type="image",
+        is_followed=False,
+    )]
 
 
 @router.post("/parse", response_model=ParseResponse)
@@ -23,11 +105,31 @@ async def parse_event(
     - text: 从文字描述中提取日程
     - image: 从图片（海报等）中识别日程
     
-    TODO: 实现 LangChain + OpenAI 调用
+    需要认证：Authorization: Bearer <token>
     """
-    # TODO: 实现 LangChain 文字解析
-    # TODO: 实现 OpenAI Vision 图片解析
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="API not implemented yet. Use /mock/parse for development.",
+    if request.input_type == "text":
+        if not request.text_content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="text_content is required for text input type",
+            )
+        events = parse_text(request.text_content, request.additional_note)
+    
+    elif request.input_type == "image":
+        if not request.image_base64:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="image_base64 is required for image input type",
+            )
+        events = parse_image(request.image_base64, request.additional_note)
+    
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="input_type must be 'text' or 'image'",
+        )
+    
+    return ParseResponse(
+        events=events,
+        parse_id=str(uuid.uuid4()),
     )
