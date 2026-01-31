@@ -15,6 +15,7 @@ import 'pages/events_page.dart';
 import 'theme/app_theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const FollowUpApp());
 }
 

@@ -51,7 +51,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     _floatController = AnimationController(
       duration: const Duration(seconds: 6),
       vsync: this,
-    )..repeat(reverse: true);
+    );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
@@ -62,8 +62,19 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     ).animate(
         CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
 
+    // 先启动登录卡片动画，确保用户可以快速交互
     _fadeController.forward();
     _slideController.forward();
+    
+    // 延迟启动背景浮动动画，避免首帧性能问题
+    // 这样用户首次点击TextField时不会卡顿
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          _floatController.repeat(reverse: true);
+        }
+      });
+    });
   }
 
   Future<void> _loadVersion() async {
@@ -111,11 +122,15 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           child: Scaffold(
             body: Stack(
               children: [
-                // Background with organic shapes
-                _OrganicBackground(floatController: _floatController),
+                // Background with organic shapes - 使用RepaintBoundary隔离重绘
+                RepaintBoundary(
+                  child: _OrganicBackground(floatController: _floatController),
+                ),
 
-                // Decorative calendar icons
-                _DecorativeCalendarIcons(floatController: _floatController),
+                // Decorative calendar icons - 使用RepaintBoundary隔离重绘
+                RepaintBoundary(
+                  child: _DecorativeCalendarIcons(floatController: _floatController),
+                ),
 
                 // Content
                 SafeArea(
@@ -216,7 +231,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        // 降低模糊强度以提升iOS性能 (原来是20)
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(
@@ -490,7 +506,7 @@ class _FollowUpLogoState extends State<_FollowUpLogo>
     _controller = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
-    )..repeat(reverse: true);
+    );
 
     // Subtle floating/bounce animation for "UP"
     _floatAnimation = Tween<double>(begin: 0, end: -4).animate(
@@ -499,6 +515,15 @@ class _FollowUpLogoState extends State<_FollowUpLogo>
         curve: Curves.easeInOut,
       ),
     );
+    
+    // 延迟启动动画，避免影响首次交互性能
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _controller.repeat(reverse: true);
+        }
+      });
+    });
   }
 
   @override
