@@ -36,7 +36,7 @@ def init_users(db: Session):
         db.add(user)
 
     db.commit()
-    print(f"✅ 已创建 {len(users_data)} 个预置用户")
+    print(f"[OK] Created {len(users_data)} preset users")
 
 
 def init_sample_events(db: Session):
@@ -48,7 +48,7 @@ def init_sample_events(db: Session):
     # 检查是否已有活动
     existing_events = db.query(Event).filter(Event.user_id == alice.id).count()
     if existing_events > 0:
-        print("示例活动已存在，跳过初始化")
+        print("[INFO] Sample events already exist, skipping initialization")
         return
 
     # 示例活动
@@ -87,16 +87,16 @@ def init_sample_events(db: Session):
         db.add(event)
 
     db.commit()
-    print(f"✅ 已创建 {len(events_data)} 个示例活动")
+    print(f"[OK] Created {len(events_data)} sample events")
 
 
 def main():
     """主函数"""
-    print("🚀 初始化数据库...")
+    print("[INIT] Initializing database...")
     
     # 创建表
     init_db()
-    print("✅ 数据库表已创建")
+    print("[OK] Database tables created")
 
     # 初始化数据
     db = SessionLocal()
@@ -106,7 +106,7 @@ def main():
     finally:
         db.close()
 
-    print("✅ 数据库初始化完成")
+    print("[OK] Database initialization completed")
 
 
 if __name__ == "__main__":

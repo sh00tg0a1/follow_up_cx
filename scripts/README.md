@@ -1,4 +1,41 @@
-# 创建测试事件脚本
+# Scripts 工具脚本
+
+## 1. 测试本地 API 服务
+
+### 方式一：直接运行批处理文件（Windows）
+
+```bash
+scripts\test_api.bat
+```
+
+### 方式二：运行 Python 脚本
+
+```bash
+# 确保已安装 requests
+pip install requests
+
+# 运行脚本
+python scripts/test_api.py
+```
+
+**注意**：运行前请确保本地服务已启动：
+```bash
+cd Backend
+uv run uvicorn main:app --reload
+```
+
+测试脚本会测试以下端点：
+1. ✅ 健康检查 (`/api/health`)
+2. ✅ 根路径 (`/`)
+3. ✅ 登录 (`/api/auth/login`)
+4. ✅ 获取用户信息 (`/api/user/me`)
+5. ✅ 解析日程 (`/api/parse`)
+6. ✅ 获取活动列表 (`/api/events`)
+7. ✅ 创建活动 (`/api/events`)
+
+---
+
+## 2. 创建测试事件脚本
 
 ## 使用方法
 
