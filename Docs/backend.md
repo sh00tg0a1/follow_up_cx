@@ -9,7 +9,7 @@
 ### 1.1 认证接口
 
 #### POST /api/auth/login
-用户登录，返回 JWT Token
+用户登录，返回 Token（Token = 密码）
 
 **请求体**:
 ```json
@@ -22,11 +22,12 @@
 **响应 200**:
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "access_token": "alice123",
   "token_type": "bearer",
   "user": {
     "id": 1,
-    "username": "alice"
+    "username": "alice",
+    "created_at": "2026-01-01T00:00:00"
   }
 }
 ```
@@ -244,7 +245,7 @@
 | BE-02 | 数据库模型定义（User, Event） | 0.5h |
 | BE-03 | 预置用户初始化脚本 | 0.5h |
 | BE-04 | 用户认证接口（POST /api/auth/login） | 1h |
-| BE-05 | JWT Token 验证中间件 | 0.5h |
+| BE-05 | 固定 Token 验证中间件（Token = 密码） | 0.5h |
 | BE-06 | 获取当前用户接口（GET /api/user/me） | 0.5h |
 | BE-07 | LangChain 集成 + Prompt 模板 | 1.5h |
 | BE-08 | 文字解析接口（POST /api/parse - text） | 1h |
@@ -295,10 +296,8 @@ Backend/
 ```bash
 # .env
 DATABASE_URL=sqlite:///./followup.db
-JWT_SECRET=your-secret-key-here
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_HOURS=24
 OPENAI_API_KEY=sk-xxx
+# JWT 已替换为固定 Token 认证（Token = 密码）
 ```
 
 ---
@@ -310,6 +309,258 @@ OPENAI_API_KEY=sk-xxx
 3. **BE-07~09**: 解析接口（核心功能）
 4. **BE-10~11**: 活动管理 + ICS（前端联调需要）
 5. **BE-12**: 收尾完善
+
+---
+
+## 七、API 调用示例
+
+> 线上环境：`${BASE_URL}`（部署后替换为实际域名）
+> 本地环境：`http://localhost:8000`
+
+以下示例使用本地地址，线上调用时替换 `localhost:8000` 为实际域名即可。
+
+### 认证说明
+
+**Token = 密码**，预置用户的 Token：
+- alice → `alice123`
+- bob → `bob123`
+- jane → `jane123`
+- xiao → `xiao123`
+
+---
+
+### 7.1 登录
+
+```bash
+# 登录获取 Token（Token 就是密码）
+curl -X POST "http://localhost:8000/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"alice123"}'
+```
+
+**响应**：
+```json
+{
+  "access_token": "alice123",
+  "token_type": "bearer",
+  "user": {"id": 1, "username": "alice", "created_at": "2026-01-01T00:00:00"}
+}
+```
+
+---
+
+### 7.2 获取用户信息
+
+```bash
+curl -X GET "http://localhost:8000/api/user/me" \
+  -H "Authorization: Bearer alice123"
+```
+
+---
+
+### 7.3 解析文字日程
+
+```bash
+# 中文文字
+curl -X POST "http://localhost:8000/api/parse" \
+  -H "Authorization: Bearer alice123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_type": "text",
+    "text_content": "明天下午3点在星巴克开会",
+    "additional_note": "记得带电脑"
+  }'
+```
+
+**响应**：
+```json
+{
+  "events": [
+    {
+      "id": null,
+      "title": "会议",
+      "start_time": "2026-02-01T15:00:00",
+      "end_time": null,
+      "location": "记得带电脑",
+      "description": "明天下午3点在星巴克开会",
+      "source_type": "text",
+      "is_followed": false
+    }
+  ],
+  "parse_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+```
+
+---
+
+### 7.4 解析图片日程
+
+```bash
+# 图片 Base64（海报、截图等）
+curl -X POST "http://localhost:8000/api/parse" \
+  -H "Authorization: Bearer alice123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_type": "image",
+    "image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "additional_note": "朋友推荐的音乐会"
+  }'
+```
+
+---
+
+### 7.5 创建活动
+
+```bash
+curl -X POST "http://localhost:8000/api/events" \
+  -H "Authorization: Bearer alice123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Team Meeting",
+    "start_time": "2026-02-01T15:00:00",
+    "end_time": "2026-02-01T16:00:00",
+    "location": "Conference Room A",
+    "description": "Weekly sync",
+    "source_type": "text",
+    "is_followed": true
+  }'
+```
+
+**响应 201**：
+```json
+{
+  "id": 1,
+  "title": "Team Meeting",
+  "start_time": "2026-02-01T15:00:00",
+  "end_time": "2026-02-01T16:00:00",
+  "location": "Conference Room A",
+  "description": "Weekly sync",
+  "source_type": "text",
+  "is_followed": true,
+  "created_at": "2026-01-31T12:00:00"
+}
+```
+
+---
+
+### 7.6 获取活动列表
+
+```bash
+# 全部活动
+curl -X GET "http://localhost:8000/api/events" \
+  -H "Authorization: Bearer alice123"
+
+# 仅已 Follow 的活动
+curl -X GET "http://localhost:8000/api/events?followed_only=true" \
+  -H "Authorization: Bearer alice123"
+```
+
+---
+
+### 7.7 获取单个活动
+
+```bash
+curl -X GET "http://localhost:8000/api/events/1" \
+  -H "Authorization: Bearer alice123"
+```
+
+---
+
+### 7.8 更新活动
+
+```bash
+# 更新标题和 Follow 状态
+curl -X PUT "http://localhost:8000/api/events/1" \
+  -H "Authorization: Bearer alice123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Updated Meeting Title",
+    "is_followed": true
+  }'
+```
+
+---
+
+### 7.9 删除活动
+
+```bash
+curl -X DELETE "http://localhost:8000/api/events/1" \
+  -H "Authorization: Bearer alice123"
+
+# 响应 204 No Content
+```
+
+---
+
+### 7.10 下载 ICS 日历文件
+
+```bash
+# 下载到文件
+curl -X GET "http://localhost:8000/api/events/1/ics" \
+  -H "Authorization: Bearer alice123" \
+  -o event.ics
+
+# 查看内容
+curl -X GET "http://localhost:8000/api/events/1/ics" \
+  -H "Authorization: Bearer alice123"
+```
+
+---
+
+### 7.11 健康检查（无需认证）
+
+```bash
+curl -X GET "http://localhost:8000/api/health"
+```
+
+**响应**：
+```json
+{"status": "healthy"}
+```
+
+---
+
+### 7.12 Mock 接口（无需认证）
+
+Mock 接口用于前端开发测试，无需 Token：
+
+```bash
+# Mock 登录
+curl -X POST "http://localhost:8000/mock/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"alice123"}'
+
+# Mock 用户信息
+curl -X GET "http://localhost:8000/mock/user/me"
+
+# Mock 解析
+curl -X POST "http://localhost:8000/mock/parse" \
+  -H "Content-Type: application/json" \
+  -d '{"input_type":"text","text_content":"明天开会"}'
+
+# Mock 活动列表
+curl -X GET "http://localhost:8000/mock/events"
+
+# Mock 创建活动
+curl -X POST "http://localhost:8000/mock/events" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Test Event","start_time":"2026-02-01T10:00:00"}'
+```
+
+---
+
+### PowerShell 用户
+
+Windows PowerShell 中 JSON 需要转义：
+
+```powershell
+# 方式一：使用 -Body 和 ConvertTo-Json
+$body = @{username="alice"; password="alice123"} | ConvertTo-Json
+Invoke-RestMethod -Uri "http://localhost:8000/api/auth/login" -Method POST -Body $body -ContentType "application/json"
+
+# 方式二：使用 curl.exe（注意 .exe）
+curl.exe -X POST "http://localhost:8000/api/auth/login" -H "Content-Type: application/json" -d "{\"username\":\"alice\",\"password\":\"alice123\"}"
+```
 
 ---
 
