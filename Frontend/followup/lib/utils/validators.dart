@@ -3,13 +3,26 @@ class Validators {
   // 验证用户名
   static String? validateUsername(String? value) {
     if (value == null || value.isEmpty) {
-      return '请输入用户名';
+      return 'Please enter your username';
     }
     if (value.length < 3) {
-      return '用户名至少3个字符';
+      return 'Username must be at least 3 characters';
     }
     if (value.length > 20) {
-      return '用户名最多20个字符';
+      return 'Username cannot exceed 20 characters';
+    }
+    return null;
+  }
+
+  // 验证邮箱
+  static String? validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter your email';
+    }
+    // Simple email regex pattern
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(value)) {
+      return 'Please enter a valid email address';
     }
     return null;
   }
@@ -17,10 +30,10 @@ class Validators {
   // 验证密码
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
-      return '请输入密码';
+      return 'Please enter your password';
     }
     if (value.length < 6) {
-      return '密码至少6个字符';
+      return 'Password must be at least 6 characters';
     }
     return null;
   }
