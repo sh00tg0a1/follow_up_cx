@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/events_provider.dart';
 import '../widgets/input_area.dart';
 import '../widgets/image_picker_widget.dart';
@@ -46,15 +47,16 @@ class _InputPageState extends State<InputPage>
   }
 
   Future<void> _parseEvent() async {
+    final l10n = AppLocalizations.of(context)!;
     final isTextMode = _tabController.index == 0;
 
-    // 验证输入
+    // Validate input
     if (isTextMode && _textController.text.trim().isEmpty) {
-      SnackBarHelper.showError(context, '请输入活动描述');
+      SnackBarHelper.showError(context, l10n.pleaseEnterEventDescription);
       return;
     }
     if (!isTextMode && _imageBase64 == null) {
-      SnackBarHelper.showError(context, '请选择图片');
+      SnackBarHelper.showError(context, l10n.pleaseSelectImage);
       return;
     }
 
@@ -86,29 +88,30 @@ class _InputPageState extends State<InputPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Consumer<EventsProvider>(
       builder: (context, eventsProvider, child) {
         return LoadingOverlay(
           isLoading: eventsProvider.isParsing,
-          message: 'AI 正在识别活动信息...',
+          message: l10n.aiRecognizing,
           child: Scaffold(
             backgroundColor: AppColors.backgroundStart,
             appBar: AppBar(
               backgroundColor: AppColors.cardBg,
-              title: const Text('添加活动'),
+              title: Text(l10n.addActivity),
               bottom: TabBar(
                 controller: _tabController,
                 labelColor: AppColors.primary,
                 indicatorColor: AppColors.primary,
-                tabs: const [
+                tabs: [
                   Tab(
-                    icon: Icon(Icons.text_snippet),
-                    text: '文字识别',
+                    icon: const Icon(Icons.text_snippet),
+                    text: l10n.textRecognition,
                   ),
                   Tab(
-                    icon: Icon(Icons.image),
-                    text: '图片识别',
+                    icon: const Icon(Icons.image),
+                    text: l10n.imageRecognition,
                   ),
                 ],
               ),
@@ -142,7 +145,7 @@ class _InputPageState extends State<InputPage>
                   child: FilledButton.icon(
                     onPressed: eventsProvider.isParsing ? null : _parseEvent,
                     icon: const Icon(Icons.auto_awesome),
-                    label: const Text('识别日程'),
+                    label: Text(l10n.recognizeSchedule),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -173,13 +176,14 @@ class _TextInputTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 说明文字
+          // Instructions
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -196,7 +200,7 @@ class _TextInputTab extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '粘贴活动描述，AI 将自动识别时间、地点等信息',
+                    l10n.pasteDescription,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -207,9 +211,9 @@ class _TextInputTab extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // 文字输入区
+          // Text input area
           Text(
-            '活动描述',
+            l10n.eventDescription,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -217,14 +221,14 @@ class _TextInputTab extends StatelessWidget {
           const SizedBox(height: 8),
           TextInputArea(
             controller: textController,
-            hintText: '例如：下周六晚上7点，汉堡爱乐音乐厅有一场贝多芬音乐会...',
+            hintText: l10n.eventDescriptionHint,
             maxLines: 10,
           ),
           const SizedBox(height: 24),
 
-          // 补充说明
+          // Additional note
           Text(
-            '补充说明（可选）',
+            l10n.additionalNote,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -250,13 +254,14 @@ class _ImageInputTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 说明文字
+          // Instructions
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -273,7 +278,7 @@ class _ImageInputTab extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '上传活动海报或传单，AI 将自动识别活动信息',
+                    l10n.uploadPoster,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -284,9 +289,9 @@ class _ImageInputTab extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // 图片选择区
+          // Image picker area
           Text(
-            '活动图片',
+            l10n.eventImage,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -295,9 +300,9 @@ class _ImageInputTab extends StatelessWidget {
           ImagePickerWidget(onImageSelected: onImageSelected),
           const SizedBox(height: 24),
 
-          // 补充说明
+          // Additional note
           Text(
-            '补充说明（可选）',
+            l10n.additionalNote,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),

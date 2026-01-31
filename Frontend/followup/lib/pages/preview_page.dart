@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:universal_html/html.dart' as html;
+import '../l10n/app_localizations.dart';
 import '../models/event.dart';
 import '../providers/events_provider.dart';
 import '../widgets/loading_overlay.dart';
@@ -121,12 +122,13 @@ class _PreviewPageState extends State<PreviewPage> {
   }
 
   Future<void> _saveEvent() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_titleController.text.trim().isEmpty) {
-      SnackBarHelper.showError(context, '请输入活动标题');
+      SnackBarHelper.showError(context, l10n.pleaseEnterEventTitle);
       return;
     }
     if (_startDate == null) {
-      SnackBarHelper.showError(context, '请选择开始日期');
+      SnackBarHelper.showError(context, l10n.pleaseSelectStartDate);
       return;
     }
 
@@ -140,7 +142,7 @@ class _PreviewPageState extends State<PreviewPage> {
       final success = await eventsProvider.saveEvent(event);
 
       if (success && mounted) {
-        SnackBarHelper.showSuccess(context, '活动已保存');
+        SnackBarHelper.showSuccess(context, l10n.activitySaved);
         Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       } else if (mounted && eventsProvider.error != null) {
         SnackBarHelper.showError(context, eventsProvider.error!);
@@ -171,17 +173,19 @@ class _PreviewPageState extends State<PreviewPage> {
           ..click();
         html.Url.revokeObjectUrl(url);
       } else {
-        // 移动端保存文件
+        // Mobile platform save file
         final directory = await getApplicationDocumentsDirectory();
         final file = File('${directory.path}/$filename');
         await file.writeAsString(icsContent);
         if (mounted) {
-          SnackBarHelper.showSuccess(context, '文件已保存到: ${file.path}');
+          final l10n = AppLocalizations.of(context)!;
+          SnackBarHelper.showSuccess(context, '${l10n.fileSaved}: ${file.path}');
         }
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, '下载失败: $e');
+        final l10n = AppLocalizations.of(context)!;
+        SnackBarHelper.showError(context, '${l10n.downloadFailed}: $e');
       }
     }
   }
@@ -230,14 +234,15 @@ class _PreviewPageState extends State<PreviewPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
-    // 如果还没有初始化数据
+    // If data not initialized yet
     if (!mounted || _events.isEmpty) {
       return Scaffold(
         backgroundColor: AppColors.backgroundStart,
         appBar: AppBar(
           backgroundColor: AppColors.cardBg,
-          title: const Text('日程预览'),
+          title: Text(l10n.schedulePreview),
         ),
         body: const SimpleWarmBackground(
           child: Center(child: CircularProgressIndicator()),
@@ -247,12 +252,12 @@ class _PreviewPageState extends State<PreviewPage> {
 
     return LoadingOverlay(
       isLoading: _isSaving,
-      message: '保存中...',
+      message: l10n.saving,
       child: Scaffold(
         backgroundColor: AppColors.backgroundStart,
         appBar: AppBar(
           backgroundColor: AppColors.cardBg,
-          title: Text(_isEditing ? '编辑活动' : '确认活动'),
+          title: Text(_isEditing ? l10n.editActivity : l10n.confirmActivity),
           actions: [
             if (_events.length > 1)
               Padding(
@@ -272,7 +277,7 @@ class _PreviewPageState extends State<PreviewPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 多个活动时显示切换提示
+                // Multiple events detected hint
                 if (_events.length > 1) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -290,7 +295,7 @@ class _PreviewPageState extends State<PreviewPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '识别到 ${_events.length} 个活动，可左右滑动切换',
+                          l10n.multipleEventsDetected(_events.length),
                           style: theme.textTheme.bodySmall,
                         ),
                       ),
@@ -317,7 +322,7 @@ class _PreviewPageState extends State<PreviewPage> {
                     child: OutlinedButton.icon(
                       onPressed: _downloadIcs,
                       icon: const Icon(Icons.download),
-                      label: const Text('下载 ICS'),
+                      label: Text(l10n.downloadIcs),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
@@ -334,7 +339,7 @@ class _PreviewPageState extends State<PreviewPage> {
                     child: FilledButton.icon(
                       onPressed: _saveEvent,
                       icon: const Icon(Icons.save),
-                      label: const Text('保存活动'),
+                      label: Text(l10n.saveActivity),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -355,13 +360,14 @@ class _PreviewPageState extends State<PreviewPage> {
 
   Widget _buildForm(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 标题
+        // Title
         Text(
-          '活动标题 *',
+          '${l10n.eventTitle} *',
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -370,7 +376,7 @@ class _PreviewPageState extends State<PreviewPage> {
         TextField(
           controller: _titleController,
           decoration: InputDecoration(
-            hintText: '请输入活动标题',
+            hintText: l10n.enterEventTitle,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -379,9 +385,9 @@ class _PreviewPageState extends State<PreviewPage> {
         ),
         const SizedBox(height: 20),
 
-        // 开始时间
+        // Start time
         Text(
-          '开始时间 *',
+          '${l10n.startTime} *',
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -392,7 +398,7 @@ class _PreviewPageState extends State<PreviewPage> {
             Expanded(
               child: _DatePickerField(
                 value: _startDate,
-                hint: '选择日期',
+                hint: l10n.selectDate,
                 onChanged: (date) {
                   setState(() {
                     _startDate = date;
@@ -404,7 +410,7 @@ class _PreviewPageState extends State<PreviewPage> {
             Expanded(
               child: _TimePickerField(
                 value: _startTime,
-                hint: '选择时间',
+                hint: l10n.selectTime,
                 onChanged: (time) {
                   setState(() {
                     _startTime = time;
@@ -416,9 +422,9 @@ class _PreviewPageState extends State<PreviewPage> {
         ),
         const SizedBox(height: 20),
 
-        // 结束时间
+        // End time
         Text(
-          '结束时间',
+          l10n.endTime,
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -429,7 +435,7 @@ class _PreviewPageState extends State<PreviewPage> {
             Expanded(
               child: _DatePickerField(
                 value: _endDate,
-                hint: '选择日期',
+                hint: l10n.selectDate,
                 onChanged: (date) {
                   setState(() {
                     _endDate = date;
@@ -441,7 +447,7 @@ class _PreviewPageState extends State<PreviewPage> {
             Expanded(
               child: _TimePickerField(
                 value: _endTime,
-                hint: '选择时间',
+                hint: l10n.selectTime,
                 onChanged: (time) {
                   setState(() {
                     _endTime = time;
@@ -453,9 +459,9 @@ class _PreviewPageState extends State<PreviewPage> {
         ),
         const SizedBox(height: 20),
 
-        // 地点
+        // Location
         Text(
-          '地点',
+          l10n.location,
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -464,7 +470,7 @@ class _PreviewPageState extends State<PreviewPage> {
         TextField(
           controller: _locationController,
           decoration: InputDecoration(
-            hintText: '活动地点',
+            hintText: l10n.eventLocation,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -473,9 +479,9 @@ class _PreviewPageState extends State<PreviewPage> {
         ),
         const SizedBox(height: 20),
 
-        // 描述
+        // Description
         Text(
-          '描述',
+          l10n.description,
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -485,7 +491,7 @@ class _PreviewPageState extends State<PreviewPage> {
           controller: _descriptionController,
           maxLines: 4,
           decoration: InputDecoration(
-            hintText: '活动描述...',
+            hintText: l10n.eventDescriptionField,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),

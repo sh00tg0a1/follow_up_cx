@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:universal_html/html.dart' as html;
+import '../l10n/app_localizations.dart';
 import '../providers/events_provider.dart';
 import '../widgets/event_card.dart';
 import '../widgets/error_dialog.dart';
@@ -38,29 +39,31 @@ class _EventsPageState extends State<EventsPage>
   }
 
   Future<void> _deleteEvent(int id) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirm = await ConfirmDialog.show(
       context,
-      title: '删除活动',
-      message: '确定要删除这个活动吗？此操作不可撤销。',
-      confirmText: '删除',
+      title: l10n.deleteEvent,
+      message: l10n.deleteEventConfirm,
+      confirmText: l10n.delete,
       isDangerous: true,
     );
 
     if (confirm && mounted) {
       final success = await context.read<EventsProvider>().deleteEvent(id);
       if (success && mounted) {
-        SnackBarHelper.showSuccess(context, '活动已删除');
+        SnackBarHelper.showSuccess(context, l10n.eventDeleted);
       }
     }
   }
 
   Future<void> _downloadIcs(int eventId, String title) async {
+    final l10n = AppLocalizations.of(context)!;
     final eventsProvider = context.read<EventsProvider>();
     final icsBytes = await eventsProvider.downloadIcs(eventId);
 
     if (icsBytes == null) {
       if (mounted) {
-        SnackBarHelper.showError(context, '下载失败');
+        SnackBarHelper.showError(context, l10n.downloadFailed);
       }
       return;
     }
@@ -69,7 +72,7 @@ class _EventsPageState extends State<EventsPage>
 
     try {
       if (kIsWeb) {
-        // Web 平台下载
+        // Web platform download
         final blob = html.Blob([icsBytes], 'text/calendar');
         final url = html.Url.createObjectUrlFromBlob(blob);
         final anchor = html.AnchorElement(href: url)
@@ -77,38 +80,40 @@ class _EventsPageState extends State<EventsPage>
           ..click();
         html.Url.revokeObjectUrl(url);
         if (mounted) {
-          SnackBarHelper.showSuccess(context, 'ICS 文件已下载');
+          SnackBarHelper.showSuccess(context, l10n.icsDownloaded);
         }
       } else {
-        // 移动端保存文件
+        // Mobile platform save file
         final directory = await getApplicationDocumentsDirectory();
         final file = File('${directory.path}/$filename');
         await file.writeAsBytes(icsBytes);
         if (mounted) {
-          SnackBarHelper.showSuccess(context, '文件已保存');
+          SnackBarHelper.showSuccess(context, l10n.fileSaved);
         }
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, '下载失败: $e');
+        SnackBarHelper.showError(context, '${l10n.downloadFailed}: $e');
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    
     return Scaffold(
       backgroundColor: AppColors.backgroundStart,
       appBar: AppBar(
         backgroundColor: AppColors.cardBg,
-        title: const Text('活动列表'),
+        title: Text(l10n.eventList),
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
           indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: '全部活动'),
-            Tab(text: '已关注'),
+          tabs: [
+            Tab(text: l10n.allEvents),
+            Tab(text: l10n.followed),
           ],
         ),
       ),
@@ -122,21 +127,21 @@ class _EventsPageState extends State<EventsPage>
             return TabBarView(
               controller: _tabController,
               children: [
-                // 全部活动
+                // All events
                 _EventsList(
                   events: eventsProvider.events,
                   eventsProvider: eventsProvider,
                   onDelete: _deleteEvent,
                   onDownloadIcs: _downloadIcs,
-                  emptyMessage: '还没有活动',
+                  emptyMessage: l10n.noEvents,
                 ),
-                // 已关注
+                // Followed
                 _EventsList(
                   events: eventsProvider.followedEvents,
                   eventsProvider: eventsProvider,
                   onDelete: _deleteEvent,
                   onDownloadIcs: _downloadIcs,
-                  emptyMessage: '还没有关注的活动',
+                  emptyMessage: l10n.noFollowedEventsYet,
                 ),
               ],
             );
@@ -147,7 +152,7 @@ class _EventsPageState extends State<EventsPage>
         onPressed: () => Navigator.pushNamed(context, '/input'),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add),
-        label: const Text('添加活动'),
+        label: Text(l10n.addEvent),
       ),
     );
   }

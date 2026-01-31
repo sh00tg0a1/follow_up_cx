@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../providers/events_provider.dart';
 import '../widgets/event_card.dart';
@@ -29,24 +30,25 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 800;
 
     final destinations = [
-      const NavigationRailDestination(
-        icon: Icon(Icons.home_outlined),
-        selectedIcon: Icon(Icons.home),
-        label: Text('首页'),
+      NavigationRailDestination(
+        icon: const Icon(Icons.home_outlined),
+        selectedIcon: const Icon(Icons.home),
+        label: Text(l10n.home),
       ),
-      const NavigationRailDestination(
-        icon: Icon(Icons.add_circle_outline),
-        selectedIcon: Icon(Icons.add_circle),
-        label: Text('添加'),
+      NavigationRailDestination(
+        icon: const Icon(Icons.add_circle_outline),
+        selectedIcon: const Icon(Icons.add_circle),
+        label: Text(l10n.add),
       ),
-      const NavigationRailDestination(
-        icon: Icon(Icons.event_outlined),
-        selectedIcon: Icon(Icons.event),
-        label: Text('活动'),
+      NavigationRailDestination(
+        icon: const Icon(Icons.event_outlined),
+        selectedIcon: const Icon(Icons.event),
+        label: Text(l10n.events),
       ),
     ];
 
@@ -94,7 +96,7 @@ class _HomePageState extends State<HomePage> {
                     child: IconButton(
                       icon: const Icon(Icons.logout),
                       onPressed: _logout,
-                      tooltip: '退出登录',
+                      tooltip: l10n.logout,
                     ),
                   ),
                 ),
@@ -130,7 +132,7 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,
-            tooltip: '退出登录',
+            tooltip: l10n.logout,
           ),
         ],
       ),
@@ -139,21 +141,21 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: AppColors.cardBg,
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) => _onDestinationSelected(index),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: '首页',
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home),
+            label: l10n.home,
           ),
           NavigationDestination(
-            icon: Icon(Icons.add_circle_outline),
-            selectedIcon: Icon(Icons.add_circle),
-            label: '添加',
+            icon: const Icon(Icons.add_circle_outline),
+            selectedIcon: const Icon(Icons.add_circle),
+            label: l10n.add,
           ),
           NavigationDestination(
-            icon: Icon(Icons.event_outlined),
-            selectedIcon: Icon(Icons.event),
-            label: '活动',
+            icon: const Icon(Icons.event_outlined),
+            selectedIcon: const Icon(Icons.event),
+            label: l10n.events,
           ),
         ],
       ),
@@ -162,10 +164,8 @@ class _HomePageState extends State<HomePage> {
 
   void _onDestinationSelected(int index) {
     if (index == 1) {
-      // 添加 - 跳转到输入页面
       Navigator.pushNamed(context, '/input');
     } else if (index == 2) {
-      // 活动 - 跳转到活动列表页面
       Navigator.pushNamed(context, '/events');
     } else {
       setState(() {
@@ -175,11 +175,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _logout() async {
+    final l10n = AppLocalizations.of(context)!;
     final confirm = await ConfirmDialog.show(
       context,
-      title: '退出登录',
-      message: '确定要退出登录吗？',
-      confirmText: '退出',
+      title: l10n.confirmLogout,
+      message: l10n.confirmLogoutMessage,
+      confirmText: l10n.logout,
       isDangerous: true,
     );
 
@@ -197,6 +198,7 @@ class _HomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Consumer<EventsProvider>(
       builder: (context, eventsProvider, child) {
@@ -210,7 +212,7 @@ class _HomeContent extends StatelessWidget {
           onRefresh: () => eventsProvider.fetchEvents(),
           child: CustomScrollView(
             slivers: [
-              // 欢迎区域
+              // Welcome section
               SliverToBoxAdapter(
                 child: Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
@@ -220,14 +222,14 @@ class _HomeContent extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '欢迎回来，${authProvider.user?.username ?? '用户'}',
+                            l10n.welcomeBack(authProvider.user?.username ?? 'User'),
                             style: theme.textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '今天有什么新的活动要添加吗？',
+                            l10n.addEventPrompt,
                             style: theme.textTheme.bodyLarge?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -239,7 +241,7 @@ class _HomeContent extends StatelessWidget {
                 ),
               ),
 
-              // 快速操作
+              // Quick actions
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -248,8 +250,8 @@ class _HomeContent extends StatelessWidget {
                       Expanded(
                         child: _QuickActionCard(
                           icon: Icons.text_snippet,
-                          title: '文字识别',
-                          subtitle: '输入活动描述',
+                          title: l10n.textRecognition,
+                          subtitle: l10n.inputDescription,
                           onTap: () => Navigator.pushNamed(
                             context,
                             '/input',
@@ -261,8 +263,8 @@ class _HomeContent extends StatelessWidget {
                       Expanded(
                         child: _QuickActionCard(
                           icon: Icons.camera_alt,
-                          title: '图片识别',
-                          subtitle: '拍照或上传',
+                          title: l10n.imageRecognition,
+                          subtitle: l10n.photoOrUpload,
                           onTap: () => Navigator.pushNamed(
                             context,
                             '/input',
@@ -275,7 +277,7 @@ class _HomeContent extends StatelessWidget {
                 ),
               ),
 
-              // 关注的活动标题
+              // Followed events title
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
@@ -283,21 +285,21 @@ class _HomeContent extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '关注的活动',
+                        l10n.followedEvents,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pushNamed(context, '/events'),
-                        child: const Text('查看全部'),
+                        child: Text(l10n.viewAll),
                       ),
                     ],
                   ),
                 ),
               ),
 
-              // 关注的活动列表
+              // Followed events list
               if (followedEvents.isEmpty)
                 SliverToBoxAdapter(
                   child: Container(
@@ -312,7 +314,7 @@ class _HomeContent extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          '还没有关注的活动',
+                          l10n.noFollowedEvents,
                           style: theme.textTheme.bodyLarge?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -321,7 +323,7 @@ class _HomeContent extends StatelessWidget {
                         TextButton.icon(
                           onPressed: () => Navigator.pushNamed(context, '/input'),
                           icon: const Icon(Icons.add),
-                          label: const Text('添加活动'),
+                          label: Text(l10n.addEvent),
                         ),
                       ],
                     ),

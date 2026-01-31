@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'l10n/app_localizations.dart';
 import 'providers/auth_provider.dart';
 import 'providers/events_provider.dart';
 import 'pages/landing_page.dart';
@@ -29,7 +31,20 @@ class FollowUpApp extends StatelessWidget {
         title: 'FollowUP',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        themeMode: ThemeMode.light, // 使用浅色主题以匹配温暖米色风格
+        themeMode: ThemeMode.light,
+        // Localization support
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('en'), // English (default)
+          Locale('zh'), // Chinese
+          Locale('de'), // German
+        ],
+        locale: const Locale('en'), // Default to English
         initialRoute: '/',
         onGenerateRoute: (settings) {
           // 路由生成器，用于传递参数

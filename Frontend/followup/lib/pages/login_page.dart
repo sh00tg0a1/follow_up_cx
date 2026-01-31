@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../utils/validators.dart';
 import '../widgets/loading_overlay.dart';
@@ -58,6 +59,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 600;
 
@@ -65,7 +67,7 @@ class _LoginPageState extends State<LoginPage> {
       builder: (context, authProvider, child) {
         return LoadingOverlay(
           isLoading: authProvider.isLoading,
-          message: '登录中...',
+          message: l10n.loggingIn,
           child: Scaffold(
             backgroundColor: AppColors.backgroundStart,
             body: SimpleWarmBackground(
@@ -91,7 +93,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 24),
                           Text(
-                            '登录以继续',
+                            l10n.loginToContinue,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyLarge?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
@@ -128,13 +130,13 @@ class _LoginPageState extends State<LoginPage> {
                             const SizedBox(height: 16),
                           ],
 
-                          // 用户名输入
+                          // Username input
                           TextFormField(
                             controller: _usernameController,
                             validator: Validators.validateUsername,
                             decoration: InputDecoration(
-                              labelText: '用户名',
-                              hintText: '请输入用户名',
+                              labelText: l10n.username,
+                              hintText: l10n.enterUsername,
                               prefixIcon: const Icon(Icons.person_outline),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -144,14 +146,14 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 16),
 
-                          // 密码输入
+                          // Password input
                           TextFormField(
                             controller: _passwordController,
                             validator: Validators.validatePassword,
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
-                              labelText: '密码',
-                              hintText: '请输入密码',
+                              labelText: l10n.password,
+                              hintText: l10n.enterPassword,
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -174,7 +176,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 24),
 
-                          // 登录按钮
+                          // Login button
                           FilledButton(
                             onPressed: _login,
                             style: FilledButton.styleFrom(
@@ -183,22 +185,22 @@ class _LoginPageState extends State<LoginPage> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Text(
-                              '登录',
-                              style: TextStyle(fontSize: 16),
+                            child: Text(
+                              l10n.login,
+                              style: const TextStyle(fontSize: 16),
                             ),
                           ),
                           const SizedBox(height: 16),
 
-                          // 返回按钮
+                          // Back button
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('返回首页'),
+                            child: Text(l10n.backToHome),
                           ),
 
                           const SizedBox(height: 32),
 
-                          // 测试账号提示
+                          // Test account info
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
@@ -209,18 +211,18 @@ class _LoginPageState extends State<LoginPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '测试账号:',
+                                  l10n.testAccount,
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '用户名: alice / 密码: alice123',
+                                  l10n.testAccountAlice,
                                   style: theme.textTheme.bodySmall,
                                 ),
                                 Text(
-                                  '用户名: demo / 密码: demo123',
+                                  l10n.testAccountDemo,
                                   style: theme.textTheme.bodySmall,
                                 ),
                               ],
