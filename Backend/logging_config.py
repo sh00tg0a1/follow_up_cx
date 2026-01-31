@@ -87,7 +87,8 @@ def get_logger(name: str) -> logging.Logger:
 import os
 _log_level = os.getenv("LOG_LEVEL", "INFO")
 _log_file = os.getenv("LOG_FILE")
-_enable_file = os.getenv("LOG_FILE_ENABLED", "true").lower() == "true"
+# 测试环境中禁用文件日志
+_enable_file = os.getenv("LOG_FILE_ENABLED", "true").lower() == "true" and os.getenv("TESTING") != "1"
 
 setup_logging(
     log_level=_log_level,

@@ -87,8 +87,15 @@ uv sync
 # Run development server
 uv run uvicorn main:app --reload
 
-# Run tests
+# Run tests (ALWAYS use venv/virtual environment)
+# Option 1: Using uv (recommended)
 uv run pytest
+
+# Option 2: Using virtualenv
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+pytest
 
 # Format code
 uv run ruff format .
@@ -96,6 +103,8 @@ uv run ruff format .
 # Lint code
 uv run ruff check .
 ```
+
+**⚠️ IMPORTANT: Always run tests in a virtual environment (venv). Never run tests with system Python directly.**
 
 ---
 
@@ -123,6 +132,13 @@ uv run ruff check .
 ### Unit Testing Requirements
 
 **All code changes MUST include unit tests.**
+
+**⚠️ CRITICAL: Always run tests in a virtual environment (venv).**
+
+- **Never** run tests with system Python directly
+- **Always** activate venv before running tests: `source venv/bin/activate` (Linux/Mac) or `venv\Scripts\activate` (Windows)
+- **Recommended**: Use `uv run pytest` which automatically manages the virtual environment
+- This ensures test isolation and prevents dependency conflicts
 
 ```python
 # Example test structure
