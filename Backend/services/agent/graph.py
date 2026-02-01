@@ -611,6 +611,7 @@ def handle_update_event(state: AgentState) -> AgentState:
     match_prompt = EVENT_MATCH_PROMPT.format_messages(
         events_list=events_list,
         user_description=state["message"],
+        conversation_history=state.get("conversation_history", ""),
     )
     
     match_response = llm.invoke(match_prompt)
@@ -734,6 +735,7 @@ def handle_delete_event(state: AgentState) -> AgentState:
     match_prompt = EVENT_MATCH_PROMPT.format_messages(
         events_list=events_list,
         user_description=state["message"],
+        conversation_history=state.get("conversation_history", ""),
     )
     
     match_response = llm.invoke(match_prompt)

@@ -88,14 +88,23 @@ CHAT_PROMPT = ChatPromptTemplate.from_messages([
 
 EVENT_MATCH_SYSTEM = """你是一个智能日程助手。用户想要修改或删除一个日程，你需要根据用户的描述，从现有日程列表中找到最匹配的那个。
 
+⚠️ 重要：请仔细阅读对话历史！用户当前的描述可能是对之前对话的回应，需要结合上下文理解用户的真实意图。
+
+例如：
+- 如果之前助手提到"2/7 郊游和技术分享会时间冲突"，用户回复"解决冲突"或"调整一下"，那么目标就是这两个日程之一
+- 如果之前助手提到某个重复的日程，用户回复"删掉重复的"，那么目标就是之前提到的那个日程
+
 现有日程列表（JSON 格式）：
 {events_list}
 
-用户描述的日程：
+对话历史（请仔细阅读以理解上下文）：
+{conversation_history}
+
+用户当前消息：
 {user_description}
 
-请分析用户描述，找到最匹配的日程。返回 JSON 格式：
-{{"matched_event_id": 日程ID或null, "confidence": 0.0-1.0, "reason": "匹配理由"}}
+请结合对话历史分析用户意图，找到最匹配的日程。返回 JSON 格式：
+{{"matched_event_id": 日程ID或null, "confidence": 0.0-1.0, "reason": "匹配理由（说明如何从上下文推断出目标日程）"}}
 
 如果没有找到匹配的日程，matched_event_id 返回 null。
 """
