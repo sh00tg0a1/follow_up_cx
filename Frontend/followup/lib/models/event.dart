@@ -7,7 +7,14 @@ class EventData {
   final String? location;
   final String? description;
   final String? sourceType;
+  final String? sourceThumbnail; // 图片来源缩略图 (base64)
   final bool isFollowed;
+  final DateTime? createdAt; // 创建时间
+  final String? recurrenceRule; // RRULE 重复规则
+  final DateTime? recurrenceEnd; // 重复结束时间
+  final int? parentEventId; // 父活动 ID（重复实例）
+  final String? icsContent; // ICS 文件内容 (base64)
+  final String? icsDownloadUrl; // ICS 下载链接
 
   EventData({
     this.id,
@@ -17,7 +24,14 @@ class EventData {
     this.location,
     this.description,
     this.sourceType,
+    this.sourceThumbnail,
     this.isFollowed = false,
+    this.createdAt,
+    this.recurrenceRule,
+    this.recurrenceEnd,
+    this.parentEventId,
+    this.icsContent,
+    this.icsDownloadUrl,
   });
 
   factory EventData.fromJson(Map<String, dynamic> json) {
@@ -31,7 +45,18 @@ class EventData {
       location: json['location'] as String?,
       description: json['description'] as String?,
       sourceType: json['source_type'] as String?,
+      sourceThumbnail: json['source_thumbnail'] as String?,
       isFollowed: json['is_followed'] as bool? ?? false,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : null,
+      recurrenceRule: json['recurrence_rule'] as String?,
+      recurrenceEnd: json['recurrence_end'] != null
+          ? DateTime.parse(json['recurrence_end'] as String)
+          : null,
+      parentEventId: json['parent_event_id'] as int?,
+      icsContent: json['ics_content'] as String?,
+      icsDownloadUrl: json['ics_download_url'] as String?,
     );
   }
 
@@ -44,7 +69,10 @@ class EventData {
       if (location != null) 'location': location,
       if (description != null) 'description': description,
       if (sourceType != null) 'source_type': sourceType,
+      if (sourceThumbnail != null) 'source_thumbnail': sourceThumbnail,
       'is_followed': isFollowed,
+      if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
+      if (recurrenceEnd != null) 'recurrence_end': recurrenceEnd!.toIso8601String(),
     };
   }
 
@@ -56,7 +84,14 @@ class EventData {
     String? location,
     String? description,
     String? sourceType,
+    String? sourceThumbnail,
     bool? isFollowed,
+    DateTime? createdAt,
+    String? recurrenceRule,
+    DateTime? recurrenceEnd,
+    int? parentEventId,
+    String? icsContent,
+    String? icsDownloadUrl,
   }) {
     return EventData(
       id: id ?? this.id,
@@ -66,7 +101,14 @@ class EventData {
       location: location ?? this.location,
       description: description ?? this.description,
       sourceType: sourceType ?? this.sourceType,
+      sourceThumbnail: sourceThumbnail ?? this.sourceThumbnail,
       isFollowed: isFollowed ?? this.isFollowed,
+      createdAt: createdAt ?? this.createdAt,
+      recurrenceRule: recurrenceRule ?? this.recurrenceRule,
+      recurrenceEnd: recurrenceEnd ?? this.recurrenceEnd,
+      parentEventId: parentEventId ?? this.parentEventId,
+      icsContent: icsContent ?? this.icsContent,
+      icsDownloadUrl: icsDownloadUrl ?? this.icsDownloadUrl,
     );
   }
 }
