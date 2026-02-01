@@ -21,7 +21,7 @@ from services.agent import run_agent, run_agent_stream, ConversationMemory
 
 logger = get_logger(__name__)
 
-router = APIRouter(tags=["智能对话"])
+router = APIRouter(tags=["Smart Chat"])
 
 
 @router.post("/chat")
@@ -48,8 +48,9 @@ async def chat(
     Requires authentication: Authorization: Bearer <token>
     """
     logger.info(f"Chat request from user {current_user.username}: {request.message[:50]}... (stream={stream})")
+    logger.debug(f"Chat request details: user_id={current_user.id}, session_id={request.session_id}, has_image={bool(request.image_base64)}, has_images={bool(request.images_base64)}")
     
-    # 处理图片：支持单张或多张图片
+    # Process images: support single or multiple images
     images_base64 = []
     if request.images_base64:
         images_base64 = request.images_base64
@@ -78,26 +79,28 @@ async def chat(
         message = request.message
         
         async def generate_stream():
-            # 在生成器内部创建独立的数据库会话
+            logger.info(f"Starting stream generation for user {user_id}, session {session_id}")
+            # Create independent database session inside generator
             stream_db = SessionLocal()
             try:
-                # 重新初始化对话记忆（使用新的 Session）
+                # Re-initialize conversation memory (using new Session)
                 stream_memory = ConversationMemory(
                     db=stream_db,
                     user_id=user_id,
                     session_id=session_id,
                 )
                 
-                # 添加用户消息到记忆
+                # Add user message to memory
                 stream_memory.add_message("user", message)
                 
                 full_response = ""
                 intent = ""
                 action_result = None
                 
-                # 发送初始事件（意图识别）
-                yield f"data: {json.dumps({'type': 'status', 'message': '正在识别意图...'}, ensure_ascii=False)}\n\n"
+                # Send initial event (intent classification)
+                yield f"data: {json.dumps({'type': 'status', 'message': 'Identifying intent...'}, ensure_ascii=False)}\n\n"
                 
+                chunk_count = 0
                 async for chunk in run_agent_stream(
                     message=message,
                     user_id=user_id,
@@ -106,10 +109,12 @@ async def chat(
                     images_base64=images_base64 if len(images_base64) > 1 else None,
                     conversation_history=conversation_history,
                 ):
+                    chunk_count += 1
                     if chunk["type"] == "thinking":
                         yield f"data: {json.dumps({'type': 'thinking', 'message': chunk['message']}, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "intent":
                         intent = chunk["intent"]
+                        logger.info(f"Intent identified: {intent}")
                         yield f"data: {json.dumps({'type': 'intent', 'intent': intent}, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "token":
                         token = chunk["token"]
@@ -126,14 +131,15 @@ async def chat(
                         # Save full response to memory
                         if full_response:
                             stream_memory.add_message("assistant", full_response)
-                        logger.info(f"Chat completed: intent={intent}, session_id={stream_memory.conversation_id}")
+                        logger.info(f"Chat completed: intent={intent}, session_id={stream_memory.conversation_id}, response_len={len(full_response)}")
                         yield f"data: {json.dumps({'type': 'done', 'session_id': stream_memory.conversation_id}, ensure_ascii=False)}\n\n"
                         break
                     elif chunk["type"] == "error":
                         error_msg = chunk.get("error", "Unknown error")
+                        logger.error(f"Error chunk received: {error_msg}")
                         yield f"data: {json.dumps({'type': 'error', 'error': error_msg}, ensure_ascii=False)}\n\n"
                         break
-                        
+                logger.info(f"Stream loop completed: processed {chunk_count} chunks")
             except Exception as e:
                 logger.error(f"Stream chat error: {e}", exc_info=True)
                 yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
@@ -141,6 +147,7 @@ async def chat(
                 # Ensure database session is closed
                 stream_db.close()
         
+        logger.info("Returning StreamingResponse")
         return StreamingResponse(
             generate_stream(),
             media_type="text/event-stream",

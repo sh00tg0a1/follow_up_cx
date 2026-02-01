@@ -1097,6 +1097,7 @@ async def run_agent_stream(
             
             intent_data = json.loads(json_str)
             intent = intent_data.get("intent", "chat")
+            logger.info(f"Intent classified: {intent}")
         except Exception as e:
             logger.warning(f"Failed to parse intent, defaulting to chat: {e}")
             intent = "chat"
@@ -1120,7 +1121,6 @@ async def run_agent_stream(
                 "reject": "Understanding your needs...",
             }
             yield {"type": "thinking", "message": thinking_messages.get(intent, "Processing...")}
-            
             agent = create_agent_graph()
             result = agent.invoke(initial_state)
             
