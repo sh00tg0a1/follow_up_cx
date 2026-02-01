@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat API 测试页面</title>
+    <!-- 注意：这是测试页面，使用 Tailwind CDN 仅用于快速开发测试 -->
+    <!-- 生产环境应使用 PostCSS 插件或 Tailwind CLI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 简单的 favicon，避免 404 错误 -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>">
+    <style>
+        /* 自定义滚动条 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* 流式文本动画 */
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        .typing-cursor::after {
+            content: '▊';
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <div class="max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h1 class="text-2xl font-bold text-slate-900 mb-2">Chat API 测试页面</h1>
+            <p class="text-slate-600 text-sm">测试智能对话接口，支持文字和多图片上传</p>
+            
+            <!-- 配置区域 -->
+            <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-gray-200">
+                <!-- 服务器快速切换 -->
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">服务器</label>
+                    <div class="flex gap-2">
+                        <button 
+                            id="serverLocal"
+                            class="server-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 cursor-pointer bg-blue-600 text-white"
+                            data-url="http://localhost:8000"
+                        >
+                            🏠 本地 (localhost:8000)
+                        </button>
+                        <button 
+                            id="serverRailway"
+                            class="server-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 cursor-pointer bg-slate-200 text-slate-700 hover:bg-slate-300"
+                            data-url="https://web-production-d2e00.up.railway.app"
+                        >
+                            ☁️ Railway (生产环境)
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">API 地址</label>
+                        <input 
+                            type="text" 
+                            id="apiUrl" 
+                            value="http://localhost:8000" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Token (alice123)</label>
+                        <input 
+                            type="text" 
+                            id="token" 
+                            value="alice123" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center gap-4">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="streamMode" checked class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <span class="ml-2 text-sm text-slate-700">流式响应 (SSE)</span>
+                    </label>
+                    <button 
+                        id="clearChatBtn"
+                        class="px-3 py-1 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors duration-200 cursor-pointer"
+                    >
+                        清除对话
+                    </button>
+                    <button 
+                        id="testConnectionBtn"
+                        class="px-3 py-1 text-sm text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded transition-colors duration-200 cursor-pointer"
+                    >
+                        测试连接
+                    </button>
+                    <button 
+                        id="listEventsBtn"
+                        class="px-3 py-1 text-sm text-green-600 hover:text-green-900 hover:bg-green-50 rounded transition-colors duration-200 cursor-pointer"
+                    >
+                        事件列表
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 聊天区域 -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col" style="height: 600px;">
+            <!-- 消息列表 -->
+            <div id="messages" class="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
+                <div class="text-center text-slate-400 text-sm py-8">
+                    开始对话...
+                </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="border-t border-gray-200 p-4">
+                <!-- 文件上传 -->
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">上传图片（支持多选）</label>
+                    <div class="flex items-center gap-2">
+                        <input 
+                            type="file" 
+                            id="fileInput" 
+                            multiple 
+                            accept="image/*" 
+                            class="hidden"
+                        />
+                        <button 
+                            id="selectFileBtn"
+                            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors duration-200 cursor-pointer"
+                        >
+                            选择图片
+                        </button>
+                        <div id="fileList" class="flex-1 flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+
+                <!-- 文本输入 -->
+                <div class="flex gap-2">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="输入消息..." 
+                        rows="2"
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    ></textarea>
+                    <button 
+                        id="sendBtn"
+                        class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        发送
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <div id="statusBar" class="mt-4 text-sm text-slate-500 text-center"></div>
+
+        <!-- 缩略图查看模态框 -->
+        <div id="thumbnailModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4" onclick="closeThumbnail(event)">
+            <div class="relative max-w-3xl max-h-full">
+                <button 
+                    onclick="closeThumbnail(event)"
+                    class="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors cursor-pointer"
+                >
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                <div id="thumbnailTitle" class="text-white text-center mb-2 font-medium"></div>
+                <img id="thumbnailImage" src="" alt="Event image" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl" />
+            </div>
+        </div>
+
+        <!-- 事件列表面板 -->
+        <div id="eventsPanel" class="hidden mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-slate-900">Events List</h2>
+                <div class="flex gap-2">
+                    <button 
+                        id="refreshEventsBtn"
+                        class="px-3 py-1 text-sm text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded transition-colors duration-200 cursor-pointer"
+                    >
+                        Refresh
+                    </button>
+                    <button 
+                        id="closeEventsPanelBtn"
+                        class="px-3 py-1 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors duration-200 cursor-pointer"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+            <div id="eventsCount" class="text-sm text-slate-500 mb-3"></div>
+            <div id="eventsList" class="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
+                <!-- Events will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+        let selectedFiles = [];
+
+        // 生成 UUID
+        function generateUUID() {
+            // 使用 crypto.randomUUID() 或回退到手动生成
+            if (crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+            // 回退方案
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // 初始化 sessionId（使用 UUID）
+        function initSessionId() {
+            if (!sessionId) {
+                sessionId = generateUUID();
+                console.log('Generated new sessionId:', sessionId);
+            }
+        }
+
+        // 绑定事件处理器
+        function initEventListeners() {
+            // 绑定服务器切换按钮
+            document.querySelectorAll('.server-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    selectServer(this);
+                });
+            });
+            
+            // 绑定文件选择事件
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+            
+            // 绑定选择文件按钮
+            document.getElementById('selectFileBtn').addEventListener('click', function() {
+                document.getElementById('fileInput').click();
+            });
+            
+            // 绑定发送按钮
+            document.getElementById('sendBtn').addEventListener('click', sendMessage);
+            
+            // 绑定测试连接按钮
+            document.getElementById('testConnectionBtn').addEventListener('click', testConnection);
+            
+            // 绑定清除对话按钮
+            document.getElementById('clearChatBtn').addEventListener('click', clearChat);
+            
+            // 绑定事件列表按钮
+            document.getElementById('listEventsBtn').addEventListener('click', toggleEventsPanel);
+            document.getElementById('refreshEventsBtn').addEventListener('click', loadEventsList);
+            document.getElementById('closeEventsPanelBtn').addEventListener('click', closeEventsPanel);
+            
+            // 绑定键盘事件 - 回车发送消息
+            document.getElementById('messageInput').addEventListener('keydown', handleKeyDown);
+            
+            // 绑定 API 地址输入框变化事件
+            document.getElementById('apiUrl').addEventListener('input', syncServerButtons);
+            
+            console.log('Event listeners initialized');
+        }
+
+        // 同步服务器按钮状态
+        function syncServerButtons() {
+            const currentUrl = document.getElementById('apiUrl').value.trim();
+            let matched = false;
+            
+            document.querySelectorAll('.server-btn').forEach(btn => {
+                const btnUrl = btn.getAttribute('data-url');
+                if (currentUrl === btnUrl) {
+                    btn.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+                    btn.classList.add('bg-blue-600', 'text-white');
+                    matched = true;
+                } else {
+                    btn.classList.remove('bg-blue-600', 'text-white');
+                    btn.classList.add('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+                }
+            });
+        }
+
+        // 选择服务器
+        function selectServer(selectedBtn) {
+            // 更新按钮样式
+            document.querySelectorAll('.server-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+            });
+            selectedBtn.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+            selectedBtn.classList.add('bg-blue-600', 'text-white');
+            
+            // 更新 API 地址
+            const url = selectedBtn.getAttribute('data-url');
+            document.getElementById('apiUrl').value = url;
+            
+            console.log('Selected server:', url);
+        }
+
+        // 页面加载完成后绑定事件处理器
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                initEventListeners();
+                initSessionId();
+            });
+        } else {
+            // DOM 已经加载完成，直接初始化
+            initEventListeners();
+            initSessionId();
+        }
+
+        // 处理文件选择
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            
+            // 过滤掉空文件和无效文件
+            const validFiles = files.filter(file => {
+                if (!file || !file.name) {
+                    console.warn('跳过无效文件');
+                    return false;
+                }
+                if (file.size === 0) {
+                    console.warn(`跳过空文件: ${file.name}`);
+                    return false;
+                }
+                if (!file.type.startsWith('image/')) {
+                    console.warn(`跳过非图片文件: ${file.name} (${file.type})`);
+                    return false;
+                }
+                return true;
+            });
+            
+            if (validFiles.length < files.length) {
+                const skippedCount = files.length - validFiles.length;
+                alert(`已跳过 ${skippedCount} 个无效文件（空文件或非图片格式）`);
+            }
+            
+            if (validFiles.length === 0) {
+                // 如果没有有效文件，清空 input
+                event.target.value = '';
+                return;
+            }
+            
+            selectedFiles = validFiles;
+            updateFileList();
+        }
+
+        // 更新文件列表显示
+        function updateFileList() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+            
+            selectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-md text-sm';
+                fileItem.innerHTML = `
+                    <span>${file.name}</span>
+                    <button 
+                        class="remove-file-btn text-blue-600 hover:text-blue-800 cursor-pointer"
+                        data-index="${index}"
+                    >×</button>
+                `;
+                // 绑定删除按钮事件
+                fileItem.querySelector('.remove-file-btn').addEventListener('click', function() {
+                    removeFile(parseInt(this.getAttribute('data-index')));
+                });
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        // 移除文件
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+            // 更新 input 元素
+            const input = document.getElementById('fileInput');
+            const dt = new DataTransfer();
+            selectedFiles.forEach(file => dt.items.add(file));
+            input.files = dt.files;
+        }
+
+        // 处理键盘事件
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const streamMode = document.getElementById('streamMode').checked;
+
+            // 初始化 sessionId（如果尚未初始化）
+            if (!sessionId) {
+                sessionId = generateUUID();
+                console.log('Generated new sessionId:', sessionId);
+            }
+
+            // 验证：必须有消息或文件
+            if (!message && selectedFiles.length === 0) {
+                alert('请输入消息或选择图片');
+                return;
+            }
+
+            // 验证：API 地址和 Token 不能为空
+            if (!apiUrl) {
+                alert('请输入 API 地址');
+                return;
+            }
+            if (!token) {
+                alert('请输入 Token');
+                return;
+            }
+
+            // 禁用发送按钮
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            sendBtn.textContent = '发送中...';
+
+            // 保存文件引用（在清空前）
+            const filesToProcess = [...selectedFiles];
+            const hasFiles = filesToProcess.length > 0;
+
+            // 验证文件是否有效
+            if (hasFiles) {
+                for (const file of filesToProcess) {
+                    if (!file || !file.name) {
+                        alert('检测到无效的文件，请重新选择');
+                        sendBtn.disabled = false;
+                        sendBtn.textContent = '发送';
+                        return;
+                    }
+                    if (file.size === 0) {
+                        alert(`文件 "${file.name}" 为空，请选择有效的图片文件`);
+                        sendBtn.disabled = false;
+                        sendBtn.textContent = '发送';
+                        return;
+                    }
+                    // 检查文件类型
+                    if (!file.type.startsWith('image/')) {
+                        alert(`文件 "${file.name}" 不是图片格式，请选择图片文件`);
+                        sendBtn.disabled = false;
+                        sendBtn.textContent = '发送';
+                        return;
+                    }
+                }
+            }
+
+            // 添加用户消息
+            addMessage('user', message || (hasFiles ? `上传了 ${filesToProcess.length} 张图片` : ''), hasFiles ? `${filesToProcess.length} 张图片` : null);
+
+            // 清空输入
+            messageInput.value = '';
+            selectedFiles = [];
+            updateFileList();
+            document.getElementById('fileInput').value = '';
+
+            try {
+                // 转换图片为 base64
+                const imagesBase64 = [];
+                for (const file of filesToProcess) {
+                    try {
+                        const base64 = await fileToBase64(file);
+                        if (base64 && base64.length > 0) {
+                            imagesBase64.push(base64);
+                        } else {
+                            console.warn(`文件 ${file.name} 转换失败（base64 为空）`);
+                        }
+                    } catch (error) {
+                        console.error(`文件 ${file.name} 转换错误:`, error);
+                        addMessage('error', `文件 "${file.name}" 处理失败: ${error.message}`);
+                    }
+                }
+
+                // 如果没有成功转换任何图片，且没有消息，则报错
+                if (imagesBase64.length === 0 && !message) {
+                    addMessage('error', '没有有效的图片或消息');
+                    sendBtn.disabled = false;
+                    sendBtn.textContent = '发送';
+                    return;
+                }
+
+                // 构建请求体
+                const requestBody = {
+                    message: message || (imagesBase64.length > 0 ? '请分析这些图片' : ''),
+                    session_id: sessionId,
+                };
+
+                if (imagesBase64.length > 0) {
+                    if (imagesBase64.length === 1) {
+                        requestBody.image_base64 = imagesBase64[0];
+                    } else {
+                        requestBody.images_base64 = imagesBase64;
+                    }
+                }
+
+                if (streamMode) {
+                    // 流式响应
+                    await sendStreamRequest(apiUrl, token, requestBody);
+                } else {
+                    // 非流式响应
+                    await sendNormalRequest(apiUrl, token, requestBody);
+                }
+            } catch (error) {
+                console.error('Send message error:', error);
+                addMessage('error', `错误: ${error.message}`);
+                updateStatus(`错误: ${error.message}`);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = '发送';
+            }
+        }
+
+        // 文件转 base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    // 移除 data:image/...;base64, 前缀，只保留 base64 数据
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 发送流式请求
+        async function sendStreamRequest(apiUrl, token, requestBody) {
+            const url = `${apiUrl}/api/chat?stream=true`;
+            console.log('Sending stream request to:', url);
+            console.log('Request body:', JSON.stringify(requestBody, null, 2));
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody),
+                });
+
+                console.log('Response status:', response.status, response.statusText);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Response error:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                if (!response.body) {
+                    throw new Error('Response body is null');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let fullResponse = '';
+                let intent = '';
+                let messageElement = null;
+
+                console.log('Starting to read stream...');
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
+                        console.log('Stream finished, remaining buffer:', buffer);
+                        // 处理剩余缓冲区
+                        if (buffer.trim()) {
+                            if (buffer.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(buffer.substring(6));
+                                    console.log('Final buffer data:', data);
+                                    processSSEData(data);
+                                } catch (e) {
+                                    console.error('Final parse error:', e, buffer);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    console.log('Received chunk:', chunk.substring(0, 100));
+                    buffer += chunk;
+                    
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // 保留最后一个不完整的行
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                console.log('SSE event:', data);
+                                
+                                switch (data.type) {
+                                    case 'thinking':
+                                        // 显示思考中状态
+                                        updateStatus(`💭 ${data.message}`);
+                                        break;
+                                    case 'status':
+                                        updateStatus(data.message);
+                                        break;
+                                    case 'intent':
+                                        intent = data.intent;
+                                        updateStatus(`意图: ${intent}`);
+                                        if (!messageElement) {
+                                            messageElement = addMessage('assistant', '', null, true);
+                                        }
+                                        break;
+                                    case 'token':
+                                        // 如果还没有创建消息元素，先创建
+                                        if (!messageElement) {
+                                            messageElement = addMessage('assistant', '', null, true);
+                                        }
+                                        fullResponse += data.token;
+                                        messageElement.querySelector('.message-content').textContent = fullResponse;
+                                        messageElement.querySelector('.message-content').classList.add('typing-cursor');
+                                        break;
+                                    case 'content':
+                                        // 一次性返回完整内容
+                                        if (!messageElement) {
+                                            messageElement = addMessage('assistant', data.content || data.message || '', null, false);
+                                        } else {
+                                            messageElement.querySelector('.message-content').textContent = data.content || data.message || '';
+                                        }
+                                        break;
+                                    case 'action':
+                                        if (data.action_result) {
+                                            addMessage('system', `操作结果: ${JSON.stringify(data.action_result, null, 2)}`);
+                                        }
+                                        break;
+                                    case 'done':
+                                        // 如果有 message 字段，显示它
+                                        if (data.message && !fullResponse) {
+                                            if (!messageElement) {
+                                                messageElement = addMessage('assistant', data.message, null, false);
+                                            } else {
+                                                messageElement.querySelector('.message-content').textContent = data.message;
+                                            }
+                                        }
+                                        if (messageElement) {
+                                            messageElement.querySelector('.message-content').classList.remove('typing-cursor');
+                                        }
+                                        if (data.session_id) {
+                                            sessionId = data.session_id;
+                                        }
+                                        updateStatus('完成');
+                                        break;
+                                    case 'error':
+                                        addMessage('error', `错误: ${data.error}`);
+                                        updateStatus('错误');
+                                        break;
+                                    default:
+                                        // 处理未知类型，可能包含 message 字段
+                                        console.log('Unknown event type:', data.type, data);
+                                        if (data.message && !messageElement) {
+                                            messageElement = addMessage('assistant', data.message, null, false);
+                                        }
+                                        break;
+                                }
+                            } catch (e) {
+                                console.error('Parse error:', e, line);
+                            }
+                        }
+                    }
+                }
+
+                // 移除光标动画
+                if (messageElement) {
+                    messageElement.querySelector('.message-content').classList.remove('typing-cursor');
+                }
+            } catch (error) {
+                console.error('Stream request error:', error);
+                updateStatus(`流式响应错误: ${error.message}`);
+                addMessage('error', `流式响应错误: ${error.message}`);
+                throw error;
+            }
+        }
+
+        // 发送普通请求
+        async function sendNormalRequest(apiUrl, token, requestBody) {
+            updateStatus('发送中...');
+
+            const url = `${apiUrl}/api/chat`;
+            console.log('Sending request to:', url);
+            console.log('Request body:', JSON.stringify(requestBody, null, 2));
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody),
+                });
+
+                console.log('Response status:', response.status, response.statusText);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Response error:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const data = await response.json();
+                
+                addMessage('assistant', data.message, null);
+                if (data.intent) {
+                    updateStatus(`意图: ${data.intent}`);
+                }
+                if (data.action_result) {
+                    addMessage('system', `操作结果: ${JSON.stringify(data.action_result, null, 2)}`);
+                }
+                if (data.session_id) {
+                    sessionId = data.session_id;
+                }
+                updateStatus('完成');
+            } catch (error) {
+                console.error('Normal request error:', error);
+                updateStatus(`请求错误: ${error.message}`);
+                addMessage('error', `请求错误: ${error.message}`);
+                throw error;
+            }
+        }
+
+        // 添加消息
+        function addMessage(role, content, imageInfo = null, isStreaming = false) {
+            const messagesDiv = document.getElementById('messages');
+            
+            // 移除"开始对话"提示
+            const emptyMsg = messagesDiv.querySelector('.text-center');
+            if (emptyMsg) {
+                emptyMsg.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            let bgColor = 'bg-blue-50';
+            let textColor = 'text-blue-900';
+            if (role === 'user') {
+                bgColor = 'bg-blue-600';
+                textColor = 'text-white';
+            } else if (role === 'error') {
+                bgColor = 'bg-red-50';
+                textColor = 'text-red-900';
+            } else if (role === 'system') {
+                bgColor = 'bg-gray-100';
+                textColor = 'text-gray-700';
+            }
+
+            // 使用 SVG 图标而不是 emoji
+            const imageIcon = imageInfo ? `
+                <div class="text-xs opacity-75 mb-1 flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span>${imageInfo}</span>
+                </div>
+            ` : '';
+            
+            // 如果是 system 消息（操作结果），使用可折叠的样式
+            if (role === 'system') {
+                const uniqueId = 'collapse-' + Date.now();
+                messageDiv.innerHTML = `
+                    <div class="max-w-[80%] ${bgColor} ${textColor} rounded-lg shadow-sm text-sm border border-gray-200">
+                        <button onclick="toggleCollapse('${uniqueId}')" class="w-full px-3 py-2 flex items-center justify-between hover:bg-gray-200 rounded-lg transition-colors">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span>接口返回</span>
+                            </span>
+                            <svg id="${uniqueId}-icon" class="w-4 h-4 transform rotate-0 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="${uniqueId}" class="hidden px-3 py-2 border-t border-gray-200">
+                            <pre class="message-content whitespace-pre-wrap text-xs font-mono overflow-x-auto">${escapeHtml(content)}</pre>
+                        </div>
+                    </div>
+                `;
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="max-w-[80%] ${bgColor} ${textColor} rounded-lg px-4 py-2 shadow-sm">
+                        ${imageIcon}
+                        <div class="message-content whitespace-pre-wrap">${escapeHtml(content)}</div>
+                    </div>
+                `;
+            }
+
+            messagesDiv.appendChild(messageDiv);
+            messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+            return messageDiv;
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 折叠/展开操作结果
+        function toggleCollapse(id) {
+            const content = document.getElementById(id);
+            const icon = document.getElementById(id + '-icon');
+            if (content && icon) {
+                if (content.classList.contains('hidden')) {
+                    content.classList.remove('hidden');
+                    icon.classList.add('rotate-180');
+                } else {
+                    content.classList.add('hidden');
+                    icon.classList.remove('rotate-180');
+                }
+            }
+        }
+
+        // 更新状态
+        function updateStatus(status) {
+            document.getElementById('statusBar').textContent = status;
+        }
+
+        // 测试连接
+        async function testConnection() {
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const token = document.getElementById('token').value.trim();
+
+            if (!apiUrl) {
+                alert('请输入 API 地址');
+                return;
+            }
+            if (!token) {
+                alert('请输入 Token');
+                return;
+            }
+
+            updateStatus('测试连接中...');
+
+            try {
+                // 测试健康检查端点
+                const healthResponse = await fetch(`${apiUrl}/api/health`);
+                console.log('Health check:', healthResponse.status, healthResponse.statusText);
+                
+                if (!healthResponse.ok) {
+                    throw new Error(`健康检查失败: ${healthResponse.status}`);
+                }
+
+                // 测试用户信息端点
+                const userResponse = await fetch(`${apiUrl}/api/user/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+                console.log('User check:', userResponse.status, userResponse.statusText);
+
+                if (!userResponse.ok) {
+                    const errorText = await userResponse.text();
+                    throw new Error(`认证失败: ${userResponse.status} - ${errorText}`);
+                }
+
+                const userData = await userResponse.json();
+                console.log('User data:', userData);
+                
+                updateStatus('连接成功！');
+                alert(`连接成功！\n用户: ${userData.username || '未知'}\n健康检查: OK`);
+            } catch (error) {
+                console.error('Connection test error:', error);
+                updateStatus(`连接失败: ${error.message}`);
+                alert(`连接失败: ${error.message}`);
+            }
+        }
+
+        // 清除对话
+        async function clearChat() {
+            if (!sessionId) {
+                alert('No active session');
+                return;
+            }
+
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const token = document.getElementById('token').value.trim();
+
+            try {
+                const response = await fetch(`${apiUrl}/api/chat/${sessionId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+
+                if (response.ok) {
+                    // Reset sessionId (generate new UUID)
+                    sessionId = generateUUID();
+                    console.log('New sessionId after clear:', sessionId);
+                    document.getElementById('messages').innerHTML = `
+                        <div class="text-center text-slate-400 text-sm py-8">
+                            Conversation cleared
+                        </div>
+                    `;
+                    updateStatus('Conversation cleared');
+                } else {
+                    alert('Clear failed');
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Toggle events panel
+        function toggleEventsPanel() {
+            const panel = document.getElementById('eventsPanel');
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                loadEventsList();
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        // Close events panel
+        function closeEventsPanel() {
+            document.getElementById('eventsPanel').classList.add('hidden');
+        }
+
+        // Load events list
+        async function loadEventsList() {
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const token = document.getElementById('token').value.trim();
+
+            if (!apiUrl || !token) {
+                alert('Please enter API URL and Token');
+                return;
+            }
+
+            const eventsList = document.getElementById('eventsList');
+            const eventsCount = document.getElementById('eventsCount');
+            
+            eventsList.innerHTML = '<div class="text-center text-slate-400 py-4">Loading...</div>';
+            eventsCount.textContent = '';
+
+            try {
+                const response = await fetch(`${apiUrl}/api/events`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const data = await response.json();
+                const events = data.events || [];
+
+                eventsCount.textContent = `Total: ${events.length} event(s)`;
+
+                if (events.length === 0) {
+                    eventsList.innerHTML = '<div class="text-center text-slate-400 py-4">No events found</div>';
+                    return;
+                }
+
+                eventsList.innerHTML = events.map(event => `
+                    <div class="p-4 bg-slate-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                        <div class="flex items-start gap-3">
+                            ${event.source_thumbnail ? `
+                                <div class="flex-shrink-0">
+                                    <img 
+                                        src="data:image/jpeg;base64,${event.source_thumbnail}" 
+                                        alt="Event thumbnail" 
+                                        class="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onclick="showThumbnail('${event.source_thumbnail}', '${escapeHtml(event.title).replace(/'/g, "\\'")}')"
+                                        title="Click to view larger"
+                                    />
+                                </div>
+                            ` : ''}
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h3 class="font-medium text-slate-900">${escapeHtml(event.title)}</h3>
+                                    ${event.is_followed ? '<span class="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">Followed</span>' : ''}
+                                    ${event.recurrence_rule ? '<span class="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">Recurring</span>' : ''}
+                                    ${event.source_thumbnail ? '<span class="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">Has Image</span>' : ''}
+                                </div>
+                                <div class="mt-1 text-sm text-slate-600">
+                                    <span class="inline-flex items-center gap-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        ${formatDateTime(event.start_time)}
+                                        ${event.end_time ? ' - ' + formatTime(event.end_time) : ''}
+                                    </span>
+                                </div>
+                                ${event.location ? `
+                                    <div class="mt-1 text-sm text-slate-500">
+                                        <span class="inline-flex items-center gap-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            </svg>
+                                            ${escapeHtml(event.location)}
+                                        </span>
+                                    </div>
+                                ` : ''}
+                                ${event.description ? `
+                                    <div class="mt-2 text-sm text-slate-500 truncate">${escapeHtml(event.description)}</div>
+                                ` : ''}
+                            </div>
+                            <div class="flex-shrink-0 flex gap-1 ml-2">
+                                <button 
+                                    onclick="deleteEvent(${event.id}, '${escapeHtml(event.title).replace(/'/g, "\\'")}');"
+                                    class="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                    title="Delete"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-xs text-slate-400">
+                            ID: ${event.id} | Source: ${event.source_type || 'manual'} | Created: ${formatDateTime(event.created_at)}
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Load events error:', error);
+                eventsList.innerHTML = `<div class="text-center text-red-500 py-4">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Delete event
+        async function deleteEvent(eventId, eventTitle) {
+            if (!confirm(`Delete event "${eventTitle}"?`)) {
+                return;
+            }
+
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const token = document.getElementById('token').value.trim();
+
+            try {
+                const response = await fetch(`${apiUrl}/api/events/${eventId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+
+                if (response.ok) {
+                    updateStatus(`Event deleted: ${eventTitle}`);
+                    loadEventsList();
+                } else {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+            } catch (error) {
+                console.error('Delete event error:', error);
+                alert(`Delete failed: ${error.message}`);
+            }
+        }
+
+        // Format date time
+        function formatDateTime(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            return date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        }
+
+        // Format time only
+        function formatTime(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            return date.toLocaleString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        }
+
+        // Show thumbnail in modal
+        function showThumbnail(base64, title) {
+            const modal = document.getElementById('thumbnailModal');
+            const image = document.getElementById('thumbnailImage');
+            const titleEl = document.getElementById('thumbnailTitle');
+            
+            image.src = `data:image/jpeg;base64,${base64}`;
+            titleEl.textContent = title;
+            modal.classList.remove('hidden');
+            
+            // Prevent body scroll when modal is open
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Close thumbnail modal
+        function closeThumbnail(event) {
+            // Only close if clicking on the backdrop or close button
+            if (event.target.id === 'thumbnailModal' || event.currentTarget.tagName === 'BUTTON') {
+                const modal = document.getElementById('thumbnailModal');
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('thumbnailModal');
+                if (!modal.classList.contains('hidden')) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

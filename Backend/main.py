@@ -1,18 +1,69 @@
 """
 FollowUP Backend - FastAPI Application
+
+路由结构：
+- /api/*   - API（使用数据库 + LLM）
 """
 import os
+import time
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+import logging
+
+# 配置日志
+from logging_config import get_logger
+
+logger = get_logger(__name__)
+
+# 导入路由
+from routers import api_router
+
+# 初始化数据库
+from database import init_db
+from init_db import init_users, init_sample_events
+from database import SessionLocal
 
 app = FastAPI(
     title="FollowUP API",
     description="智能日程助手 - 从任意输入智能提取日程",
     version="0.1.0"
 )
+
+
+# 启动时初始化数据库
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化数据库和运行迁移"""
+    # 测试环境中跳过初始化（测试会自己管理数据库）
+    if os.getenv("TESTING") == "1":
+        return
+    
+    # 创建表结构
+    init_db()
+    
+    # 运行数据库迁移（添加缺失的列等）
+    # 迁移是幂等的，可以安全地多次运行
+    try:
+        from migrate_db import migrate_events_table
+        migrate_events_table()
+        logger.info("Database migration completed successfully")
+    except Exception as e:
+        # 迁移失败不影响应用启动，只记录警告
+        # 这允许应用在数据库结构不完整时仍能启动（用于调试）
+        logger.warning(f"Database migration failed (non-critical): {e}")
+        logger.warning("Application will continue to start, but some features may not work correctly")
+    
+    # 初始化预置用户
+    db = SessionLocal()
+    try:
+        init_users(db)
+        # 可选：初始化示例活动
+        # init_sample_events(db)
+    finally:
+        db.close()
 
 # CORS 配置
 app.add_middleware(
@@ -23,21 +74,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 注册 API 路由 (/api/*)
+app.include_router(api_router)
+
 
 @app.get("/api/health")
 async def health_check():
     """健康检查端点"""
+    logger.debug("Health check requested")
     return {"status": "healthy"}
-
-
-# TODO: 后续添加以下 API 路由
-# - POST /api/auth/login
-# - GET /api/user/me
-# - POST /api/parse
-# - GET /api/events
-# - POST /api/events/follow
-# - DELETE /api/events/{id}
-# - GET /api/events/{id}/ics
 
 
 # Flutter Web 静态文件托管
@@ -65,16 +110,34 @@ if FLUTTER_WEB_DIR.exists():
 else:
     @app.get("/")
     async def root():
-        """Flutter Web 未构建时的提示"""
+        """API 根路径 - Flutter Web 未构建时的提示"""
         return {
             "status": "ok",
             "message": "FollowUP API is running!",
+            "docs": "/docs",
             "note": "Flutter Web not built yet. Run: cd Frontend/followup && flutter build web",
-            "version": "0.1.0"
+            "version": "0.1.0",
+            "api_endpoints": {
+                "auth": "POST /api/auth/login",
+                "user": "GET /api/user/me",
+                "parse": "POST /api/parse",
+                "events": "GET/POST /api/events",
+                "health": "GET /api/health",
+            },
         }
 
 
 if __name__ == "__main__":
     import uvicorn
+    
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    # 默认禁用 reload，避免 SQLite WAL 文件导致的频繁重载
+    # 如果需要热重载，可以设置环境变量 RELOAD=true
+    enable_reload = os.getenv("RELOAD", "false").lower() == "true"
+    
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=enable_reload,  # 默认禁用，避免频繁重载
+    )

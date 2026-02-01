@@ -1,0 +1,257 @@
+{
+  "@@locale": "en",
+  
+  "appName": "FollowUP",
+  "@appName": {
+    "description": "The application name"
+  },
+
+  "login": "Login",
+  "loginToContinue": "Login to continue",
+  "loggingIn": "Logging in...",
+  "username": "Username",
+  "enterUsername": "Enter username",
+  "password": "Password",
+  "enterPassword": "Enter password",
+  "backToHome": "Back to Home",
+  "testAccount": "Test Account:",
+  "testAccountAlice": "Username: alice / Password: alice123",
+  "testAccountDemo": "Username: demo / Password: demo123",
+
+  "home": "Home",
+  "add": "Add",
+  "events": "Events",
+  "logout": "Logout",
+  "confirmLogout": "Confirm Logout",
+  "confirmLogoutMessage": "Are you sure you want to logout?",
+
+  "welcomeBack": "Welcome back, {username}",
+  "@welcomeBack": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "addEventPrompt": "Any new events to add today?",
+
+  "textRecognition": "Text Recognition",
+  "inputDescription": "Input description",
+  "imageRecognition": "Image Recognition",
+  "photoOrUpload": "Photo or upload",
+  
+  "followedEvents": "Followed Events",
+  "viewAll": "View All",
+  "noFollowedEvents": "No followed events yet",
+  "addEvent": "Add Event",
+
+  "addActivity": "Add Activity",
+  "pasteDescription": "Paste event description, AI will automatically recognize time, location, etc.",
+  "eventDescription": "Event Description",
+  "eventDescriptionHint": "e.g., Next Saturday at 7pm, there's a Beethoven concert at Hamburg Philharmonic...",
+  "additionalNote": "Additional Note (Optional)",
+  "uploadPoster": "Upload event poster or flyer, AI will automatically recognize event information",
+  "eventImage": "Event Image",
+  "recognizeSchedule": "Recognize Schedule",
+  "aiRecognizing": "AI is recognizing event information...",
+
+  "schedulePreview": "Schedule Preview",
+  "editActivity": "Edit Activity",
+  "confirmActivity": "Confirm Activity",
+  "eventTitle": "Event Title",
+  "enterEventTitle": "Enter event title",
+  "startTime": "Start Time",
+  "endTime": "End Time",
+  "selectDate": "Select date",
+  "selectTime": "Select time",
+  "location": "Location",
+  "eventLocation": "Event location",
+  "description": "Description",
+  "eventDescriptionField": "Event description...",
+  "downloadIcs": "Download ICS",
+  "saveActivity": "Save Activity",
+  "saving": "Saving...",
+  "activitySaved": "Activity saved",
+  "multipleEventsDetected": "Detected {count} events, swipe left/right to switch",
+  "@multipleEventsDetected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "eventList": "Event List",
+  "allEvents": "All Events",
+  "followed": "Followed",
+  "noEvents": "No events yet",
+  "noFollowedEventsYet": "No followed events yet",
+  "deleteEvent": "Delete Event",
+  "deleteEventConfirm": "Are you sure you want to delete this event? This action cannot be undone.",
+  "delete": "Delete",
+  "cancel": "Cancel",
+  "eventDeleted": "Event deleted",
+  "icsDownloaded": "ICS file downloaded",
+  "downloadFailed": "Download failed",
+  "fileSaved": "File saved",
+
+  "pleaseEnterEventDescription": "Please enter event description",
+  "pleaseSelectImage": "Please select an image",
+  "pleaseEnterEventTitle": "Please enter event title",
+  "pleaseSelectStartDate": "Please select start date",
+
+  "landingHeroTitle": "Never Miss an Event Again",
+  "landingHeroSubtitle": "FollowUP is your smart personal assistant for tracking events. Automatically extract event information from text or images, sync to your calendar, and get timely reminders.",
+  "getStarted": "Get Started",
+  "learnMore": "Learn More",
+
+  "painPointsTitle": "Do You Ever Experience These Problems?",
+  "painPoint1Title": "Scattered Information",
+  "painPoint1Desc": "Event info buried in emails, chats, and social media, hard to track",
+  "painPoint2Title": "Manual Entry is Tedious",
+  "painPoint2Desc": "Manually entering events into calendar is time-consuming and error-prone",
+  "painPoint3Title": "Easy to Forget",
+  "painPoint3Desc": "Missing important events due to no timely reminders",
+
+  "howItWorksTitle": "How It Works",
+  "step1Title": "Capture Information",
+  "step1Desc": "Paste text or upload event poster/screenshot",
+  "step2Title": "AI Recognition",
+  "step2Desc": "Intelligently extract time, location, and other key info",
+  "step3Title": "One-Click Save",
+  "step3Desc": "Confirm and add to calendar with reminders",
+
+  "featuresTitle": "Key Features",
+  "feature1Title": "Text Recognition",
+  "feature1Desc": "Paste event description and let AI extract the information",
+  "feature2Title": "Image Recognition",
+  "feature2Desc": "Upload event posters or screenshots for automatic parsing",
+  "feature3Title": "Calendar Sync",
+  "feature3Desc": "Export to ICS format, sync with any calendar app",
+  "feature4Title": "Follow Events",
+  "feature4Desc": "Follow important events for timely reminders",
+
+  "demoTitle": "See It In Action",
+  "demoDesc": "Watch how FollowUP transforms messy event info into organized calendar entries",
+  "tryNow": "Try Now",
+
+  "pricingTitle": "Simple, Transparent Pricing",
+  "pricingFree": "Free",
+  "pricingFreePriceDesc": "for personal use",
+  "pricingFreeFeature1": "10 events per month",
+  "pricingFreeFeature2": "Text recognition",
+  "pricingFreeFeature3": "Basic calendar export",
+  "pricingPro": "Pro",
+  "pricingProPrice": "€4.99",
+  "pricingProPriceDesc": "/month",
+  "pricingProFeature1": "Unlimited events",
+  "pricingProFeature2": "Image recognition",
+  "pricingProFeature3": "Priority AI processing",
+  "pricingProFeature4": "Advanced reminders",
+  "mostPopular": "Most Popular",
+  "startFreeTrial": "Start Free Trial",
+  "pricingTeam": "Team",
+  "pricingTeamPrice": "€19.99",
+  "pricingTeamPriceDesc": "/month",
+  "pricingTeamFeature1": "Everything in Pro",
+  "pricingTeamFeature2": "Team collaboration",
+  "pricingTeamFeature3": "Shared calendars",
+  "pricingTeamFeature4": "Admin dashboard",
+  "contactSales": "Contact Sales",
+
+  "faqTitle": "Frequently Asked Questions",
+  "faq1Question": "What types of events can FollowUP recognize?",
+  "faq1Answer": "FollowUP can recognize most event formats including concerts, meetings, conferences, social gatherings, and more. It works with both formal and informal event descriptions.",
+  "faq2Question": "How accurate is the AI recognition?",
+  "faq2Answer": "Our AI achieves 95%+ accuracy for standard event formats. You can always review and edit the extracted information before saving.",
+  "faq3Question": "Can I sync with Google Calendar or Apple Calendar?",
+  "faq3Answer": "Yes! Export events as ICS files and import them into any calendar app including Google Calendar, Apple Calendar, Outlook, and more.",
+  "faq4Question": "Is my data secure?",
+  "faq4Answer": "Absolutely. We use industry-standard encryption and never share your data with third parties. Your events are stored securely and only accessible by you.",
+
+  "footerTagline": "Your Smart Event Assistant",
+  "footerProduct": "Product",
+  "footerFeatures": "Features",
+  "footerPricing": "Pricing",
+  "footerCompany": "Company",
+  "footerAbout": "About",
+  "footerContact": "Contact",
+  "footerLegal": "Legal",
+  "footerPrivacy": "Privacy",
+  "footerTerms": "Terms",
+  "footerCopyright": "© 2025 FollowUP. All rights reserved.",
+
+  "signIn": "Sign In",
+  "or": "or",
+
+  "privacyFirst": "Privacy First",
+  "quickSetup": "30 Second Setup",
+  "freeToStart": "Free to Start",
+
+  "painPointsSubtitle": "Life events come at you fast",
+  "painPointsDesc": "Important dates come as screenshots, posters, messages, or voice memos.\nManually adding to calendar? Tedious and easy to forget.",
+  "painPointNeedSimpler": "You need a simpler way",
+
+  "painPointPhoto": "Event poster screenshots",
+  "painPointMessage": "Dates in messages",
+  "painPointFlyer": "Flyers and invitations",
+  "painPointVoice": "Voice memos",
+
+  "captureStep": "Capture",
+  "captureStepDesc": "Photo, text, or voice",
+  "understandStep": "Understand",
+  "understandStepDesc": "AI smart processing",
+  "confirmStep": "Confirm",
+  "confirmStepDesc": "Review and edit",
+  "doneStep": "Done",
+  "doneStepDesc": "Add to calendar",
+
+  "featurePrivacyTitle": "Privacy First",
+  "featurePrivacyDesc": "No account required, your data is stored securely",
+  "featureSmartTitle": "Smart Recognition",
+  "featureSmartDesc": "AI automatically extracts date, time, location and key info",
+  "featureControlTitle": "Full Control",
+  "featureControlDesc": "Review and edit recognition results before confirming",
+  "featureFocusSubtitle": "Reduce mental load, focus on life",
+  "featureFocusDesc": "FollowUP quietly manages your schedule, letting you focus on what really matters",
+
+  "demoInputLabel": "Input",
+  "demoTextTab": "Text",
+  "demoImageTab": "Image",
+  "demoVoiceTab": "Voice",
+  "demoInputPlaceholder": "Enter text containing event information...",
+  "demoClickUpload": "Click to upload image",
+  "demoClickRecord": "Click to start recording",
+  "demoEventPreview": "Event Preview",
+  "demoTeamDinner": "Team Dinner",
+  "demoRecognized": "Successfully recognized",
+  "demoNextFriday": "Next Friday 19:00",
+  "demoRestaurant": "Olive Garden Restaurant · Main Street",
+  "demoBirthdayCard": "Remember to bring Sarah's birthday card",
+  "demoExtractedEvent": "Extracted event will appear here",
+  "demoAddToCalendar": "Add to Calendar",
+
+  "theProblem": "The Problem",
+
+  "stillHaveQuestions": "Still have questions?",
+  "everythingYouNeed": "Everything you need to know about FollowUP",
+
+  "footerCTATitle": "Ready to never forget an event again?",
+  "footerCTASubtitle": "Start using FollowUP for free and let AI manage your schedule",
+  "footerDescription": "Transform life's moments into calendar events\nNever worry about forgetting again",
+
+  "chatWelcome": "Hi {username}! 👋 I'm your FollowUP assistant. Tell me about an event you'd like to add to your calendar, or paste any text containing event information.",
+  "@chatWelcome": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "chatStartHint": "Start a conversation to add events",
+  "chatInputHint": "Describe an event or paste text...",
+  "chatProcessing": "I found event information in your message! Would you like me to extract the details and add it to your calendar?",
+  "chatExtractEvent": "Extract Event",
+  "chatUploadImage": "Upload Image",
+  "chatViewEvents": "My Events"
+}

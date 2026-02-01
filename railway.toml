@@ -1,7 +1,9 @@
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+# 使用默认 builder (Nixpacks)，自动检测 Python
+buildCommand = "pip install -r Backend/requirements.txt"
 
 [deploy]
+# 使用 sh -c 来切换目录并启动
+startCommand = "sh -c 'cd Backend && uvicorn main:app --host 0.0.0.0 --port $PORT'"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
