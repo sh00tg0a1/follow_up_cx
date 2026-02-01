@@ -349,11 +349,32 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  void _clearConversation() {
+  void _clearConversation() async {
+    // 获取当前用户的 session ID (username)
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final username = authProvider.user?.username;
+    
+    // 只有登录用户才能清除历史
+    if (username == null) {
+      return;
+    }
+
+    // 清除本地消息
     setState(() {
       _messages.clear();
-      ChatService.clearSession();
     });
+
+    // 清除服务端历史（使用用户名作为 session ID）
+    try {
+      await ChatService.clearHistory(username);
+    } catch (e) {
+      // 服务端清除失败时静默处理，本地已清除
+      debugPrint('Failed to clear server history: $e');
+    }
+
+    // 清除本地 session
+    ChatService.clearSession();
+    
     _addWelcomeMessage();
   }
 
