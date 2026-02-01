@@ -1,11 +1,11 @@
 """
-智能对话路由 - /api/chat
+Smart Chat Routes - /api/chat
 
-基于 LangGraph 的智能 Agent，支持：
-- 意图识别（闲聊/创建/修改/删除日程）
-- 图片+文字输入
-- 对话记忆
-- 流式响应（SSE）
+LangGraph-based intelligent Agent supporting:
+- Intent classification (chat/create/update/delete events)
+- Image + text input
+- Conversation memory
+- Streaming responses (SSE)
 """
 import json
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -27,25 +27,25 @@ router = APIRouter(tags=["智能对话"])
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
-    stream: bool = Query(False, description="是否使用流式响应（SSE）"),
+    stream: bool = Query(False, description="Whether to use streaming response (SSE)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    智能对话接口
+    Smart chat interface
     
-    支持意图识别和多轮对话：
-    - 闲聊：直接用 LLM 回复
-    - 创建日程：解析输入并创建日程
-    - 修改日程：根据描述匹配并修改日程
-    - 删除日程：根据描述匹配并删除日程
+    Supports intent classification and multi-turn conversations:
+    - Chat: Direct LLM response
+    - Create event: Parse input and create event
+    - Update event: Match by description and update event
+    - Delete event: Match by description and delete event
     
-    支持图片输入，会使用 Vision 模型分析图片内容。
+    Supports image input, uses Vision model to analyze image content.
     
-    参数：
-    - stream: 是否使用流式响应（SSE），默认 false
+    Parameters:
+    - stream: Whether to use streaming response (SSE), default false
     
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     logger.info(f"Chat request from user {current_user.username}: {request.message[:50]}... (stream={stream})")
     
@@ -116,21 +116,21 @@ async def chat(
                         full_response += token
                         yield f"data: {json.dumps({'type': 'token', 'token': token}, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "content":
-                        # 非流式完整内容
+                        # Non-streaming full content
                         full_response = chunk.get("content", "")
                         yield f"data: {json.dumps({'type': 'content', 'content': full_response}, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "action":
                         action_result = chunk["action_result"]
                         yield f"data: {json.dumps({'type': 'action', 'action_result': action_result}, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "done":
-                        # 保存完整回复到记忆
+                        # Save full response to memory
                         if full_response:
                             stream_memory.add_message("assistant", full_response)
                         logger.info(f"Chat completed: intent={intent}, session_id={stream_memory.conversation_id}")
                         yield f"data: {json.dumps({'type': 'done', 'session_id': stream_memory.conversation_id}, ensure_ascii=False)}\n\n"
                         break
                     elif chunk["type"] == "error":
-                        error_msg = chunk.get("error", "未知错误")
+                        error_msg = chunk.get("error", "Unknown error")
                         yield f"data: {json.dumps({'type': 'error', 'error': error_msg}, ensure_ascii=False)}\n\n"
                         break
                         
@@ -138,7 +138,7 @@ async def chat(
                 logger.error(f"Stream chat error: {e}", exc_info=True)
                 yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
             finally:
-                # 确保关闭数据库会话
+                # Ensure database session is closed
                 stream_db.close()
         
         return StreamingResponse(
@@ -147,22 +147,22 @@ async def chat(
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲
+                "X-Accel-Buffering": "no",  # Disable Nginx buffering
             }
         )
     else:
-        # 非流式响应
-        # 初始化对话记忆
+        # Non-streaming response
+        # Initialize conversation memory
         memory = ConversationMemory(
             db=db,
             user_id=current_user.id,
             session_id=request.session_id,
         )
         
-        # 获取对话历史
+        # Get conversation history
         conversation_history = memory.get_formatted_history(limit=10)
         
-        # 添加用户消息到记忆
+        # Add user message to memory
         memory.add_message("user", request.message)
         
         try:
@@ -202,9 +202,9 @@ async def clear_conversation(
     db: Session = Depends(get_db),
 ):
     """
-    清除对话历史
+    Clear conversation history
     
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     logger.info(f"Clear conversation request from user {current_user.username}: session_id={session_id}")
     
@@ -216,11 +216,11 @@ async def clear_conversation(
         )
         memory.clear()
         
-        return {"message": "对话历史已清除", "session_id": session_id}
+        return {"message": "Conversation history cleared", "session_id": session_id}
         
     except Exception as e:
         logger.error(f"Clear conversation error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"清除对话历史时出错：{str(e)}",
+            detail=f"Error clearing conversation history: {str(e)}",
         )

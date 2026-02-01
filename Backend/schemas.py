@@ -1,28 +1,28 @@
 """
-Pydantic Schemas - 请求/响应模型
+Pydantic Schemas - Request/Response Models
 """
 from datetime import datetime
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
 
 
-# ============ 用户相关 ============
+# ============ User Related ============
 
 class LoginRequest(BaseModel):
-    """登录请求"""
+    """Login request"""
     username: str = Field(..., min_length=1, max_length=50)
     password: str = Field(..., min_length=1, max_length=100)
 
 
 class UserResponse(BaseModel):
-    """用户信息响应"""
+    """User information response"""
     id: int
     username: str
     created_at: datetime
 
 
 class LoginResponse(BaseModel):
-    """登录响应"""
+    """Login response"""
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
@@ -60,22 +60,22 @@ class ParseResponse(BaseModel):
     clarification_question: Optional[str] = None  # 澄清问题（当 needs_clarification=True 时）
 
 
-# ============ 活动管理相关 ============
+# ============ Event Management Related ============
 
 class EventCreate(BaseModel):
-    """创建活动请求"""
+    """Create event request"""
     title: str = Field(..., min_length=1, max_length=255)
     start_time: datetime
     end_time: Optional[datetime] = None
     location: Optional[str] = Field(None, max_length=500)
     description: Optional[str] = None
     source_type: Optional[str] = Field("manual", max_length=50)
-    source_thumbnail: Optional[str] = Field(None, description="图片来源的缩略图（base64）")
+    source_thumbnail: Optional[str] = Field(None, description="Thumbnail of image source (base64)")
     is_followed: bool = True
 
 
 class EventUpdate(BaseModel):
-    """更新活动请求"""
+    """Update event request"""
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
@@ -130,33 +130,33 @@ class DeleteDuplicatesResponse(BaseModel):
     deleted_ids: List[int]  # 成功删除的事件 ID
 
 
-# ============ 智能对话相关 ============
+# ============ Smart Chat Related ============
 
 class ChatRequest(BaseModel):
-    """智能对话请求"""
-    message: str = Field(..., min_length=1, description="用户消息")
-    image_base64: Optional[str] = Field(None, description="可选的单张图片 base64 编码（向后兼容）")
-    images_base64: Optional[List[str]] = Field(None, description="可选的多张图片 base64 编码列表")
-    session_id: Optional[str] = Field(None, description="会话ID（可选，不传则后端自动生成）")
+    """Smart chat request"""
+    message: str = Field(..., min_length=1, description="User message")
+    image_base64: Optional[str] = Field(None, description="Optional single image base64 encoded (backward compatibility)")
+    images_base64: Optional[List[str]] = Field(None, description="Optional multiple images base64 encoded list")
+    session_id: Optional[str] = Field(None, description="Session ID (optional, backend auto-generates if not provided)")
 
 
 class ChatResponse(BaseModel):
-    """智能对话响应"""
-    message: str = Field(..., description="Agent 回复消息")
-    intent: str = Field(..., description="识别的意图: chat/create_event/update_event/delete_event/reject")
-    session_id: str = Field(..., description="会话ID")
-    action_result: Optional[dict] = Field(None, description="操作结果（如创建的日程详情）")
+    """Smart chat response"""
+    message: str = Field(..., description="Agent reply message")
+    intent: str = Field(..., description="Recognized intent: chat/create_event/update_event/delete_event/reject")
+    session_id: str = Field(..., description="Session ID")
+    action_result: Optional[dict] = Field(None, description="Action result (e.g., created event details)")
 
 
 class ConversationMessage(BaseModel):
-    """对话消息"""
-    role: Literal["user", "assistant"] = Field(..., description="消息角色")
-    content: str = Field(..., description="消息内容")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="消息时间")
+    """Conversation message"""
+    role: Literal["user", "assistant"] = Field(..., description="Message role")
+    content: str = Field(..., description="Message content")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Message timestamp")
 
 
-# ============ 通用 ============
+# ============ Common ============
 
 class ErrorResponse(BaseModel):
-    """错误响应"""
+    """Error response"""
     detail: str

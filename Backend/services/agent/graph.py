@@ -28,25 +28,25 @@ logger = get_logger(__name__)
 
 
 # ============================================================================
-# Agent 状态定义
+# Agent State Definition
 # ============================================================================
 
 class AgentState(TypedDict):
-    """Agent 状态"""
-    # 输入
+    """Agent state"""
+    # Input
     message: str
     image_base64: Optional[str]
-    images_base64: Optional[List[str]]  # 多张图片支持
+    images_base64: Optional[List[str]]  # Support for multiple images
     user_id: int
     conversation_history: str
     
-    # 处理结果
+    # Processing results
     intent: str
     confidence: float
     response: str
     action_result: Optional[dict]
     
-    # 数据库会话（不序列化）
+    # Database session (not serialized)
     db: Session
 
 
@@ -66,23 +66,23 @@ def get_llm() -> ChatOpenAI:
 
 
 def classify_intent(state: AgentState) -> AgentState:
-    """意图分类节点"""
+    """Intent classification node"""
     logger.debug(f"Classifying intent for message: {state['message'][:50]}...")
     
     llm = get_llm()
     current_time = datetime.now().isoformat()
     
-    # 构建图片说明
+    # Build image note
     image_note = ""
     images_count = 0
     if state.get("images_base64"):
         images_count = len(state["images_base64"])
-        image_note = f"（用户附带了 {images_count} 张图片）"
+        image_note = f"(User attached {images_count} image(s))"
     elif state.get("image_base64"):
         images_count = 1
-        image_note = "（用户附带了一张图片）"
+        image_note = "(User attached an image)"
     
-    # 调用 LLM 进行意图分类
+    # Call LLM for intent classification
     prompt = INTENT_CLASSIFIER_PROMPT.format_messages(
         current_time=current_time,
         message=state["message"],
@@ -105,9 +105,9 @@ def classify_intent(state: AgentState) -> AgentState:
     
     response = llm.invoke(messages)
     
-    # 解析 JSON 结果
+    # Parse JSON result
     try:
-        # 尝试提取 JSON
+        # Try to extract JSON
         content = response.content
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
@@ -153,7 +153,7 @@ def handle_chat(state: AgentState) -> AgentState:
 
 
 async def handle_chat_stream(state: AgentState):
-    """处理闲聊对话（流式）"""
+    """Handle chat conversation (streaming)"""
     logger.debug("Handling chat (streaming)...")
     
     llm = get_llm()
@@ -165,14 +165,14 @@ async def handle_chat_stream(state: AgentState):
         conversation_history=state.get("conversation_history", ""),
     )
     
-    # 流式调用 LLM
+    # Stream LLM call
     full_response = ""
     async for chunk in llm.astream(prompt):
         if hasattr(chunk, 'content') and chunk.content:
             full_response += chunk.content
             yield {"type": "token", "token": chunk.content}
     
-    # 更新状态
+    # Update state
     state["response"] = full_response
     state["action_result"] = None
 
@@ -199,19 +199,19 @@ def check_duplicate_event(db: Session, user_id: int, title: str, start_time: dat
 
 
 def handle_create_event(state: AgentState) -> AgentState:
-    """处理创建日程（支持多图片）"""
+    """Handle event creation (supports multiple images)"""
     logger.debug("Handling create event...")
     
     db = state["db"]
     images_base64 = []
     
-    # 收集所有图片
+    # Collect all images
     if state.get("images_base64"):
         images_base64 = state["images_base64"]
     elif state.get("image_base64"):
         images_base64 = [state["image_base64"]]
     
-    # 如果有多张图片，使用批量解析
+    # Use batch parsing if multiple images
     if len(images_base64) > 1:
         logger.info(f"Processing {len(images_base64)} images for event creation")
         try:
@@ -230,7 +230,7 @@ def handle_create_event(state: AgentState) -> AgentState:
             created_events = []
             duplicate_events = []
             for parsed_event in parsed_events:
-                # 检查是否重复
+                # Check for duplicates
                 duplicate = check_duplicate_event(
                     db, state["user_id"], parsed_event.title, parsed_event.start_time
                 )
@@ -239,12 +239,12 @@ def handle_create_event(state: AgentState) -> AgentState:
                     logger.info(f"Duplicate event detected: {parsed_event.title} at {parsed_event.start_time}")
                     continue
                 
-                # 生成缩略图（使用第一张图片）
+                # Generate thumbnail (using first image)
                 thumbnail = None
                 if images_base64:
                     thumbnail = generate_thumbnail(images_base64[0])
                 
-                # parsed_event 是 ParsedEvent 对象
+                # parsed_event is a ParsedEvent object
                 event = Event(
                     user_id=state["user_id"],
                     title=parsed_event.title,
@@ -326,28 +326,28 @@ def handle_create_event(state: AgentState) -> AgentState:
             }
         except Exception as e:
             logger.error(f"Failed to parse multiple images: {e}", exc_info=True)
-            # 降级到单图片处理
+            # Fallback to single image processing
     
-    # 单图片或文本处理
-    # 如果有图片，优先使用专门的图片解析服务
+    # Single image or text processing
+    # Use dedicated image parsing service if image is present
     if images_base64 and len(images_base64) == 1:
         logger.info("Using image parsing service for single image")
         try:
             from services.llm_service import parse_image_with_llm
             from services.image_utils import generate_thumbnail
             
-            # 使用专门的图片解析服务
+            # Use dedicated image parsing service
             parse_result = parse_image_with_llm(
                 images_base64[0],
                 additional_note=state.get("message", "")
             )
             
-            # 如果解析出事件，直接使用
+            # Use parsed events directly if available
             if parse_result.events:
                 logger.info(f"Image parsing service extracted {len(parse_result.events)} event(s)")
-                parsed_event = parse_result.events[0]  # 使用第一个事件
+                parsed_event = parse_result.events[0]  # Use first event
                 
-                # 检查是否重复
+                # Check for duplicates
                 duplicate = check_duplicate_event(
                     db, state["user_id"], parsed_event.title, parsed_event.start_time
                 )
@@ -355,7 +355,7 @@ def handle_create_event(state: AgentState) -> AgentState:
                     logger.info(f"Duplicate event detected: {parsed_event.title} at {parsed_event.start_time}")
                     return {
                         **state,
-                        "response": f"⚠️ 这个日程已经存在了：**{duplicate.title}**（{duplicate.start_time.strftime('%Y年%m月%d日 %H:%M')}）。需要我帮您修改吗？",
+                        "response": f"⚠️ This event already exists: **{duplicate.title}** ({duplicate.start_time.strftime('%Y-%m-%d %H:%M')}). Would you like me to modify it?",
                         "action_result": {
                             "action": "create_event",
                             "duplicate": True,
@@ -364,7 +364,7 @@ def handle_create_event(state: AgentState) -> AgentState:
                         },
                     }
                 
-                # 创建事件
+                # Create event
                 event = Event(
                     user_id=state["user_id"],
                     title=parsed_event.title,
@@ -382,21 +382,21 @@ def handle_create_event(state: AgentState) -> AgentState:
                 
                 logger.info(f"Created event from image: {event.title} (id={event.id})")
                 
-                # 生成 ICS 文件内容
+                # Generate ICS file content
                 from services.ics_service import generate_ics_content
                 ics_content = generate_ics_content(event)
                 
-                # 构建响应
-                response_text = f"好的，我已经为您创建了日程：\n\n"
+                # Build response
+                response_text = f"Event created:\n\n"
                 response_text += f"📅 **{event.title}**\n"
-                response_text += f"⏰ 时间：{event.start_time.strftime('%Y年%m月%d日 %H:%M')}"
+                response_text += f"⏰ Time: {event.start_time.strftime('%Y-%m-%d %H:%M')}"
                 if event.end_time:
                     response_text += f" - {event.end_time.strftime('%H:%M')}"
                 response_text += "\n"
                 if event.location:
-                    response_text += f"📍 地点：{event.location}\n"
+                    response_text += f"📍 Location: {event.location}\n"
                 if event.description:
-                    response_text += f"📝 描述：{event.description}\n"
+                    response_text += f"📝 Description: {event.description}\n"
                 
                 return {
                     **state,
@@ -410,7 +410,7 @@ def handle_create_event(state: AgentState) -> AgentState:
                     },
                 }
             
-            # 如果需要澄清，返回澄清问题
+            # Return clarification question if needed
             if parse_result.needs_clarification and parse_result.clarification_question:
                 logger.info("Image parsing requires clarification")
                 return {
@@ -419,29 +419,29 @@ def handle_create_event(state: AgentState) -> AgentState:
                     "action_result": {"action": "create_event", "need_more_info": True},
                 }
             
-            # 如果没有解析出事件且不需要澄清，继续使用文本提取
+            # Continue with text extraction if no events parsed and no clarification needed
             logger.warning("Image parsing service returned no events, falling back to text extraction")
         except Exception as e:
             logger.warning(f"Image parsing service failed: {e}, falling back to text extraction", exc_info=True)
-            # 继续使用文本提取逻辑
+            # Continue with text extraction logic
     
-    # 文本提取逻辑（无图片或图片解析失败后的降级方案）
+    # Text extraction logic (fallback when no image or image parsing failed)
     llm = get_llm()
     current_time = datetime.now().isoformat()
     
-    # 构建图片说明
+    # Build image note
     image_note = ""
     if images_base64:
-        image_note = "（用户附带了图片，请从图片中提取日程信息）"
+        image_note = "(User attached image(s), please extract event information from images)"
     
-    # 提取日程信息
+    # Extract event information
     prompt = EVENT_EXTRACTION_PROMPT.format_messages(
         current_time=current_time,
         message=state["message"],
         image_note=image_note,
     )
     
-    # 如果有图片，使用多模态
+    # Use multimodal if images are present
     if images_base64:
         content = [{"type": "text", "text": prompt[1].content}]
         for img_base64 in images_base64:
@@ -455,7 +455,7 @@ def handle_create_event(state: AgentState) -> AgentState:
     
     response = llm.invoke(messages)
     
-    # 解析事件信息
+    # Parse event information
     try:
         content = response.content
         if "```json" in content:
@@ -465,20 +465,20 @@ def handle_create_event(state: AgentState) -> AgentState:
         
         event_data = json.loads(content.strip())
         
-        # 检查必要字段
+        # Check required fields
         if "start_time" not in event_data or not event_data["start_time"]:
             raise ValueError("Missing required field: start_time")
         
-        title = event_data.get("title", "新日程")
+        title = event_data.get("title", "New Event")
         start_time = datetime.fromisoformat(event_data["start_time"])
         
-        # 检查是否重复
+        # Check for duplicates
         duplicate = check_duplicate_event(db, state["user_id"], title, start_time)
         if duplicate:
             logger.info(f"Duplicate event detected: {title} at {start_time}")
             return {
                 **state,
-                "response": f"⚠️ 这个日程已经存在了：**{duplicate.title}**（{duplicate.start_time.strftime('%Y年%m月%d日 %H:%M')}）。需要我帮您修改吗？",
+                "response": f"⚠️ This event already exists: **{duplicate.title}** ({duplicate.start_time.strftime('%Y-%m-%d %H:%M')}). Would you like me to modify it?",
                 "action_result": {
                     "action": "create_event",
                     "duplicate": True,
@@ -487,7 +487,7 @@ def handle_create_event(state: AgentState) -> AgentState:
                 },
             }
         
-        # 创建事件
+        # Create event
         event = Event(
             user_id=state["user_id"],
             title=title,
@@ -505,21 +505,21 @@ def handle_create_event(state: AgentState) -> AgentState:
         logger.info(f"Created event: {event.title} (id={event.id})")
         
         
-        # 生成 ICS 文件内容
+        # Generate ICS file content
         from services.ics_service import generate_ics_content
         ics_content = generate_ics_content(event)
         
-        # 构建响应
-        response_text = f"好的，我已经为您创建了日程：\n\n"
+        # Build response
+        response_text = f"Event created:\n\n"
         response_text += f"📅 **{event.title}**\n"
-        response_text += f"⏰ 时间：{event.start_time.strftime('%Y年%m月%d日 %H:%M')}"
+        response_text += f"⏰ Time: {event.start_time.strftime('%Y-%m-%d %H:%M')}"
         if event.end_time:
             response_text += f" - {event.end_time.strftime('%H:%M')}"
         response_text += "\n"
         if event.location:
-            response_text += f"📍 地点：{event.location}\n"
+            response_text += f"📍 Location: {event.location}\n"
         if event.description:
-            response_text += f"📝 备注：{event.description}\n"
+            response_text += f"📝 Notes: {event.description}\n"
         
         return {
             **state,
@@ -539,9 +539,9 @@ def handle_create_event(state: AgentState) -> AgentState:
         
         has_image = state.get("image_base64") or state.get("images_base64")
         if has_image:
-            response_text = "我看到了您上传的图片，但无法从中提取完整的日程信息。\n\n请告诉我：\n📅 这个活动是什么时候？\n📍 在哪里举办？\n📝 还有其他需要记录的信息吗？"
+            response_text = "I see you uploaded an image, but I couldn't extract complete event information from it.\n\nPlease tell me:\n📅 When is this event? (e.g., tomorrow at 3 PM)\n📍 Where is it? (optional)\n📝 Any other information to record?"
         else:
-            response_text = "我想帮您创建日程，但需要更多信息。\n\n请告诉我：\n📅 什么时候？（如：明天下午3点）\n📝 什么活动？（如：团队会议）\n📍 在哪里？（可选）"
+            response_text = "I'd like to help you create an event, but I need more information.\n\nPlease tell me:\n📅 When? (e.g., tomorrow at 3 PM)\n📝 What event? (e.g., team meeting)\n📍 Where? (optional)"
         
         return {
             **state,
@@ -554,9 +554,9 @@ def handle_create_event(state: AgentState) -> AgentState:
         
         has_image = state.get("image_base64") or state.get("images_base64")
         if has_image:
-            response_text = "我看到了您上传的图片，但缺少一些必要信息来创建日程。\n\n请告诉我：\n📅 这个活动是什么时候？（这是必填信息）\n📍 在哪里举办？\n📝 还有其他需要记录的信息吗？"
+            response_text = "I see you uploaded an image, but some required information is missing to create the event.\n\nPlease tell me:\n📅 When is this event? (required)\n📍 Where is it?\n📝 Any other information to record?"
         else:
-            response_text = "我想帮您创建日程，但缺少必要信息。\n\n请告诉我：\n📅 什么时候？（这是必填信息，如：明天下午3点）\n📝 什么活动？（如：团队会议）\n📍 在哪里？（可选）"
+            response_text = "I'd like to help you create an event, but required information is missing.\n\nPlease tell me:\n📅 When? (required, e.g., tomorrow at 3 PM)\n📝 What event? (e.g., team meeting)\n📍 Where? (optional)"
         
         return {
             **state,
@@ -568,9 +568,9 @@ def handle_create_event(state: AgentState) -> AgentState:
         
         has_image = state.get("image_base64") or state.get("images_base64")
         if has_image:
-            response_text = "我看到了您上传的图片，但在处理时遇到了问题。\n\n请告诉我：\n📅 这个活动是什么时候？\n📍 在哪里举办？\n📝 还有其他需要记录的信息吗？"
+            response_text = "I see you uploaded an image, but encountered an error while processing it.\n\nPlease tell me:\n📅 When is this event?\n📍 Where is it?\n📝 Any other information to record?"
         else:
-            response_text = "我想帮您创建日程，但需要更多信息。\n\n请告诉我：\n📅 什么时候？（如：明天下午3点）\n📝 什么活动？（如：团队会议）\n📍 在哪里？（可选）"
+            response_text = "I'd like to help you create an event, but I need more information.\n\nPlease tell me:\n📅 When? (e.g., tomorrow at 3 PM)\n📝 What event? (e.g., team meeting)\n📍 Where? (optional)"
         
         return {
             **state,
@@ -629,20 +629,20 @@ def handle_update_event(state: AgentState) -> AgentState:
         if not matched_id:
             return {
                 **state,
-                "response": "抱歉，我没有找到匹配的日程。请更详细地描述您想修改的日程。",
+                "response": "Sorry, I couldn't find a matching event. Please describe the event you want to update in more detail.",
                 "action_result": {"action": "update_event", "error": "no_match"},
             }
         
-        # 获取目标事件
+        # Get target event
         event = db.query(Event).filter(Event.id == matched_id, Event.user_id == user_id).first()
         if not event:
             return {
                 **state,
-                "response": "抱歉，找不到该日程。",
+                "response": "Sorry, event not found.",
                 "action_result": {"action": "update_event", "error": "event_not_found"},
             }
         
-        # 提取更新信息
+        # Extract update information
         original_event = json.dumps({
             "title": event.title,
             "start_time": event.start_time.isoformat(),
@@ -666,7 +666,7 @@ def handle_update_event(state: AgentState) -> AgentState:
         
         update_data = json.loads(content.strip())
         
-        # 更新事件
+        # Update event
         if "title" in update_data and update_data["title"]:
             event.title = update_data["title"]
         if "start_time" in update_data and update_data["start_time"]:
@@ -683,10 +683,10 @@ def handle_update_event(state: AgentState) -> AgentState:
         
         logger.info(f"Updated event: {event.title} (id={event.id})")
         
-        response_text = f"好的，我已经为您更新了日程「{event.title}」：\n"
-        response_text += f"⏰ 时间：{event.start_time.strftime('%Y年%m月%d日 %H:%M')}\n"
+        response_text = f"Event updated: **{event.title}**\n"
+        response_text += f"⏰ Time: {event.start_time.strftime('%Y-%m-%d %H:%M')}\n"
         if event.location:
-            response_text += f"📍 地点：{event.location}\n"
+            response_text += f"📍 Location: {event.location}\n"
         
         return {
             **state,
@@ -698,29 +698,29 @@ def handle_update_event(state: AgentState) -> AgentState:
         logger.error(f"Failed to update event: {e}")
         return {
             **state,
-            "response": "抱歉，修改日程时出错了。请稍后重试。",
+            "response": "Sorry, an error occurred while updating the event. Please try again later.",
             "action_result": {"action": "update_event", "error": str(e)},
         }
 
 
 def handle_delete_event(state: AgentState) -> AgentState:
-    """处理删除日程"""
+    """Handle event deletion"""
     logger.debug("Handling delete event...")
     
     db = state["db"]
     user_id = state["user_id"]
     
-    # 获取用户的日程列表
+    # Get user's event list
     events = db.query(Event).filter(Event.user_id == user_id).order_by(Event.start_time).all()
     
     if not events:
         return {
             **state,
-            "response": "您目前没有任何日程，无法进行删除。",
+            "response": "You currently have no events to delete.",
             "action_result": {"action": "delete_event", "error": "no_events"},
         }
     
-    # 使用 LLM 匹配目标日程
+    # Use LLM to match target event
     llm = get_llm()
     events_list = json.dumps([
         {
@@ -753,16 +753,16 @@ def handle_delete_event(state: AgentState) -> AgentState:
         if not matched_id:
             return {
                 **state,
-                "response": "抱歉，我没有找到匹配的日程。请更详细地描述您想删除的日程。",
+                "response": "Sorry, I couldn't find a matching event. Please describe the event you want to delete in more detail.",
                 "action_result": {"action": "delete_event", "error": "no_match"},
             }
         
-        # 获取并删除目标事件
+        # Get and delete target event
         event = db.query(Event).filter(Event.id == matched_id, Event.user_id == user_id).first()
         if not event:
             return {
                 **state,
-                "response": "抱歉，找不到该日程。",
+                "response": "Sorry, event not found.",
                 "action_result": {"action": "delete_event", "error": "event_not_found"},
             }
         
@@ -774,7 +774,7 @@ def handle_delete_event(state: AgentState) -> AgentState:
         
         return {
             **state,
-            "response": f"好的，我已经为您删除了日程「{event_title}」。",
+            "response": f"Event deleted: **{event_title}**",
             "action_result": {"action": "delete_event", "event_id": matched_id},
         }
         
@@ -782,30 +782,30 @@ def handle_delete_event(state: AgentState) -> AgentState:
         logger.error(f"Failed to delete event: {e}")
         return {
             **state,
-            "response": "抱歉，删除日程时出错了。请稍后重试。",
+            "response": "Sorry, an error occurred while deleting the event. Please try again later.",
             "action_result": {"action": "delete_event", "error": str(e)},
         }
 
 
 def handle_query_event(state: AgentState) -> AgentState:
-    """处理查询日程"""
+    """Handle event query"""
     logger.debug("Handling query event...")
     
     db = state["db"]
     user_id = state["user_id"]
     message = state["message"]
     
-    # 使用普通查询
+    # Use regular query
     events = db.query(Event).filter(Event.user_id == user_id).order_by(Event.start_time).all()
     
     if not events:
         return {
             **state,
-            "response": "您目前没有任何日程。需要我帮您创建一个吗？",
+            "response": "You currently have no events. Would you like me to create one for you?",
             "action_result": {"action": "query_event", "events_count": 0, "events": []},
         }
     
-    # 使用 LLM 根据用户请求智能回复
+    # Use LLM to intelligently respond based on user request
     llm = get_llm()
     current_time = datetime.now().isoformat()
     
@@ -852,18 +852,18 @@ def handle_query_event(state: AgentState) -> AgentState:
 
 
 def handle_reject(state: AgentState) -> AgentState:
-    """处理不确定的请求 - 友好询问用户"""
+    """Handle unclear requests - friendly user inquiry"""
     logger.debug("Handling unclear request with friendly response...")
     
     message = state.get("message", "")
     has_image = state.get("image_base64") or state.get("images_base64")
     
     if has_image:
-        # 有图片时，询问用户想要做什么
-        response = "我看到您上传了图片！请问您希望我如何处理呢？\n\n我可以帮您：\n📅 从图片中提取活动信息并创建日程\n🔍 了解图片中的内容\n\n请告诉我您的需求~"
+        # Ask user what they want to do when image is present
+        response = "I see you uploaded an image! How would you like me to handle it?\n\nI can help you:\n📅 Extract event information from the image and create an event\n🔍 Understand the content in the image\n\nPlease tell me what you need~"
     else:
-        # 没有图片，友好地询问更多信息
-        response = f"您好！我注意到您的消息是：「{message[:50]}{'...' if len(message) > 50 else ''}」\n\n请问您是想要：\n📅 创建新日程\n🔍 查看我的日程\n✏️ 修改某个日程\n\n可以告诉我更多细节吗？"
+        # Friendly inquiry for more information when no image
+        response = f"Hello! I noticed your message: 「{message[:50]}{'...' if len(message) > 50 else ''}」\n\nAre you looking to:\n📅 Create a new event\n🔍 View my events\n✏️ Update an event\n\nCan you tell me more details?"
     
     return {
         **state,
@@ -895,16 +895,16 @@ def route_by_intent(state: AgentState) -> str:
 
 
 # ============================================================================
-# 构建图
+# Graph Construction
 # ============================================================================
 
 def create_agent_graph() -> StateGraph:
-    """创建 Agent 状态图"""
+    """Create Agent state graph"""
     
-    # 创建图
+    # Create graph
     graph = StateGraph(AgentState)
     
-    # 添加节点
+    # Add nodes
     graph.add_node("intent_classifier", classify_intent)
     graph.add_node("chat", handle_chat)
     graph.add_node("create_event", handle_create_event)
@@ -913,10 +913,10 @@ def create_agent_graph() -> StateGraph:
     graph.add_node("delete_event", handle_delete_event)
     graph.add_node("reject", handle_reject)
     
-    # 设置入口
+    # Set entry point
     graph.set_entry_point("intent_classifier")
     
-    # 添加条件边（根据意图路由）
+    # Add conditional edges (route based on intent)
     graph.add_conditional_edges(
         "intent_classifier",
         route_by_intent,
@@ -930,7 +930,7 @@ def create_agent_graph() -> StateGraph:
         }
     )
     
-    # 所有处理节点都结束
+    # All processing nodes end here
     graph.add_edge("chat", END)
     graph.add_edge("create_event", END)
     graph.add_edge("query_event", END)
@@ -942,7 +942,7 @@ def create_agent_graph() -> StateGraph:
 
 
 # ============================================================================
-# 运行 Agent
+# Run Agent
 # ============================================================================
 
 def run_agent(
@@ -954,22 +954,22 @@ def run_agent(
     conversation_history: str = "",
 ) -> dict:
     """
-    运行 Agent 处理用户请求
+    Run Agent to process user request
     
     Args:
-        message: 用户消息
-        user_id: 用户 ID
-        db: 数据库会话
-        image_base64: 可选的单张图片 base64（向后兼容）
-        images_base64: 可选的多张图片 base64 列表
-        conversation_history: 对话历史
+        message: User message
+        user_id: User ID
+        db: Database session
+        image_base64: Optional single image base64 (backward compatibility)
+        images_base64: Optional list of multiple image base64
+        conversation_history: Conversation history
         
     Returns:
-        包含 intent, response, action_result 的字典
+        Dictionary containing intent, response, action_result
     """
     logger.info(f"Running agent for user {user_id}: {message[:50]}...")
     
-    # 创建并运行图
+    # Create and run graph
     agent = create_agent_graph()
     
     initial_state = AgentState(
@@ -985,7 +985,7 @@ def run_agent(
         db=db,
     )
     
-    # 运行图
+    # Run graph
     result = agent.invoke(initial_state)
     
     logger.info(f"Agent completed: intent={result['intent']}")
@@ -1006,30 +1006,30 @@ async def run_agent_stream(
     conversation_history: str = "",
 ):
     """
-    运行 Agent 处理用户请求（流式）
+    Run Agent to process user request (streaming)
     
     Args:
-        message: 用户消息
-        user_id: 用户 ID
-        db: 数据库会话
-        image_base64: 可选的图片 base64
-        conversation_history: 对话历史
+        message: User message
+        user_id: User ID
+        db: Database session
+        image_base64: Optional image base64
+        conversation_history: Conversation history
         
     Yields:
-        流式事件字典，包含 type 和相应数据：
-        - {"type": "thinking", "message": "正在思考..."} - 思考中状态
-        - {"type": "intent", "intent": "chat"} - 意图识别完成
-        - {"type": "token", "token": "字"} - 流式文本 token（仅 chat 意图）
-        - {"type": "content", "content": "完整回复"} - 完整回复（非 chat 意图）
-        - {"type": "action", "action_result": {...}} - 操作结果（如创建的日程）
-        - {"type": "done"} - 完成
-        - {"type": "error", "error": "错误信息"} - 错误
+        Streaming event dictionary containing type and corresponding data:
+        - {"type": "thinking", "message": "Thinking..."} - Thinking state
+        - {"type": "intent", "intent": "chat"} - Intent classification completed
+        - {"type": "token", "token": "word"} - Streaming text token (chat intent only)
+        - {"type": "content", "content": "Full response"} - Full response (non-chat intent)
+        - {"type": "action", "action_result": {...}} - Action result (e.g., created events)
+        - {"type": "done"} - Done
+        - {"type": "error", "error": "Error message"} - Error
     """
     logger.info(f"Running agent (streaming) for user {user_id}: {message[:50]}...")
     
     try:
-        # 发送 thinking 事件 - 开始理解请求
-        yield {"type": "thinking", "message": "正在理解您的请求..."}
+        # Send thinking event - start understanding request
+        yield {"type": "thinking", "message": "Understanding your request..."}
         
         initial_state = AgentState(
             message=message,
@@ -1044,15 +1044,15 @@ async def run_agent_stream(
             db=db,
         )
         
-        # 第一步：意图识别（非流式，快速判断）
+        # Step 1: Intent classification (non-streaming, quick judgment)
         llm = get_llm()
         current_time = datetime.now().isoformat()
         
         image_note = ""
         if images_base64:
-            image_note = f"（用户附带了 {len(images_base64)} 张图片）"
+            image_note = f"(User attached {len(images_base64)} image(s))"
         elif image_base64:
-            image_note = "（用户附带了一张图片）"
+            image_note = "(User attached an image)"
         
         prompt = INTENT_CLASSIFIER_PROMPT.format_messages(
             current_time=current_time,
@@ -1062,7 +1062,7 @@ async def run_agent_stream(
         )
         
         if images_base64:
-            # 多张图片：添加所有图片
+            # Multiple images: add all images
             content = [{"type": "text", "text": prompt[1].content}]
             for img_base64 in images_base64:
                 content.append({
@@ -1071,7 +1071,7 @@ async def run_agent_stream(
                 })
             messages = [prompt[0], HumanMessage(content=content)]
         elif image_base64:
-            # 单张图片（向后兼容）
+            # Single image (backward compatibility)
             content = [
                 {"type": "text", "text": prompt[1].content},
                 {
@@ -1085,7 +1085,7 @@ async def run_agent_stream(
         
         intent_response = llm.invoke(messages)
         
-        # 解析意图
+        # Parse intent
         try:
             content = intent_response.content
             if "```json" in content:
@@ -1103,32 +1103,32 @@ async def run_agent_stream(
         
         yield {"type": "intent", "intent": intent}
         
-        # 第二步：根据意图生成回复
+        # Step 2: Generate response based on intent
         if intent == "chat":
-            # 闲聊：发送 thinking 事件，然后流式生成回复
-            yield {"type": "thinking", "message": "正在思考回复..."}
+            # Chat: send thinking event, then stream response
+            yield {"type": "thinking", "message": "Thinking of a response..."}
             async for chunk in handle_chat_stream(initial_state):
                 yield chunk
         else:
-            # 其他意图（create_event/query_event/update_event/delete_event/reject）
-            # 发送 thinking 事件，说明正在执行操作
+            # Other intents (create_event/query_event/update_event/delete_event/reject)
+            # Send thinking event indicating operation in progress
             thinking_messages = {
-                "create_event": "正在创建日程...",
-                "query_event": "正在查询日程...",
-                "update_event": "正在修改日程...",
-                "delete_event": "正在删除日程...",
-                "reject": "正在理解您的需求...",
+                "create_event": "Creating event...",
+                "query_event": "Querying events...",
+                "update_event": "Updating event...",
+                "delete_event": "Deleting event...",
+                "reject": "Understanding your needs...",
             }
-            yield {"type": "thinking", "message": thinking_messages.get(intent, "正在处理...")}
+            yield {"type": "thinking", "message": thinking_messages.get(intent, "Processing...")}
             
             agent = create_agent_graph()
             result = agent.invoke(initial_state)
             
-            # 发送操作结果（如果有）
+            # Send action result if available
             if result.get("action_result"):
                 yield {"type": "action", "action_result": result.get("action_result")}
             
-            # 直接发送完整回复（非流式操作，直接返回结果更清晰）
+            # Send full response directly (non-streaming operations, direct result is clearer)
             full_response = result.get("response", "")
             if full_response:
                 yield {"type": "content", "content": full_response}

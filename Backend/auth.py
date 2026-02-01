@@ -1,7 +1,7 @@
 """
-Authentication - 固定 Token 验证（Token = 密码）
+Authentication - Fixed Token Verification (Token = Password)
 
-从数据库查询用户并验证 Token
+Query user from database and verify Token
 """
 from typing import Optional
 from fastapi import Depends, HTTPException, status
@@ -20,16 +20,16 @@ security = HTTPBearer(auto_error=False)
 
 def verify_token(token: str, db: Session) -> Optional[User]:
     """
-    验证固定 Token（Token = 密码）
+    Verify fixed Token (Token = Password)
 
-    支持的 Token：
-    - alice123 -> alice 用户
-    - bob123 -> bob 用户
-    - jane123 -> jane 用户
-    - xiao123 -> xiao 用户
-    - moni123 -> moni 用户
+    Supported Tokens:
+    - alice123 -> alice user
+    - bob123 -> bob user
+    - jane123 -> jane user
+    - xiao123 -> xiao user
+    - moni123 -> moni user
     """
-    # 从数据库查找密码匹配的用户
+    # Find user from database matching password
     user = db.query(User).filter(User.password == token).first()
     return user
 
@@ -73,7 +73,7 @@ async def get_current_user_optional(
     db: Session = Depends(get_db),
 ) -> Optional[User]:
     """
-    可选认证：如果提供了 Token 则验证，否则返回 None
+    Optional authentication: Verify if Token is provided, otherwise return None
     """
     if credentials is None:
         return None

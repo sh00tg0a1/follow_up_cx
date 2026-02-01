@@ -1,9 +1,9 @@
 """
-活动路由 - /api/events/*
+Event Routes - /api/events/*
 
-CRUD 操作 + ICS 文件生成
-使用固定 Token 认证
-从数据库查询和操作
+CRUD operations + ICS file generation
+Uses fixed Token authentication
+Queries and operations from database
 """
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -32,11 +32,11 @@ router = APIRouter(prefix="/events", tags=["活动管理"])
 
 def event_to_response(event: Event, include_ics: bool = False) -> EventResponse:
     """
-    将数据库模型转换为响应模型
+    Convert database model to response model
     
     Args:
-        event: Event 模型实例
-        include_ics: 是否包含 ICS 文件内容
+        event: Event model instance
+        include_ics: Whether to include ICS file content
     """
     ics_content = None
     ics_download_url = None
@@ -64,14 +64,14 @@ def event_to_response(event: Event, include_ics: bool = False) -> EventResponse:
 
 @router.get("", response_model=EventListResponse)
 async def list_events(
-    followed_only: bool = Query(False, description="仅返回已 Follow 的活动"),
+    followed_only: bool = Query(False, description="Only return followed events"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    获取用户的活动列表
+    Get user's event list
 
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     logger.info(f"Listing events for user {current_user.username} (followed_only={followed_only})")
     
@@ -90,21 +90,21 @@ async def list_events(
 
 @router.get("/search", response_model=EventListResponse)
 async def search_events(
-    q: str = Query(..., min_length=1, description="搜索查询（自然语言）"),
-    limit: int = Query(10, ge=1, le=50, description="返回结果数量"),
+    q: str = Query(..., min_length=1, description="Search query (natural language)"),
+    limit: int = Query(10, ge=1, le=50, description="Number of results to return"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    搜索活动（使用文本搜索）
+    Search events (using text search)
 
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     from sqlalchemy import or_
     
     logger.info(f"Searching events for user {current_user.username}: '{q}' (limit={limit})")
     
-    # 使用 LIKE 文本搜索
+    # Use LIKE text search
     search_pattern = f"%{q}%"
     events = db.query(Event).filter(
         Event.user_id == current_user.id,
@@ -128,44 +128,44 @@ async def find_duplicates(
     db: Session = Depends(get_db),
 ):
     """
-    查询用户的重复事件
+    Query user's duplicate events
     
-    重复定义：标题相同且开始时间相同的事件
+    Duplicate definition: Events with the same title and start time
     
-    返回分组的重复事件列表，每组包含：
-    - key: 重复标识
-    - events: 该组所有重复事件
-    - keep_id: 建议保留的事件 ID（最早创建的）
-    - delete_ids: 建议删除的事件 ID 列表
+    Returns grouped duplicate event list, each group contains:
+    - key: Duplicate identifier
+    - events: All duplicate events in this group
+    - keep_id: Suggested event ID to keep (earliest created)
+    - delete_ids: List of suggested event IDs to delete
     
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     from sqlalchemy import func
     from collections import defaultdict
     
     logger.info(f"Finding duplicate events for user {current_user.username}")
     
-    # 查询所有事件
+    # Query all events
     all_events = db.query(Event).filter(
         Event.user_id == current_user.id
     ).order_by(Event.created_at).all()
     
-    # 按 (title, start_time) 分组
+    # Group by (title, start_time)
     groups_dict = defaultdict(list)
     for event in all_events:
         key = (event.title, event.start_time)
         groups_dict[key].append(event)
     
-    # 过滤出有重复的组
+    # Filter groups with duplicates
     duplicate_groups = []
     total_duplicates = 0
     
     for (title, start_time), events in groups_dict.items():
         if len(events) > 1:
-            # 有重复
+            # Has duplicates
             key_str = f"{title} @ {start_time.strftime('%Y-%m-%d %H:%M')}"
             
-            # 按创建时间排序，保留最早的
+            # Sort by creation time, keep the earliest
             sorted_events = sorted(events, key=lambda e: e.created_at)
             keep_event = sorted_events[0]
             delete_events = sorted_events[1:]
@@ -194,17 +194,17 @@ async def delete_duplicates(
     db: Session = Depends(get_db),
 ):
     """
-    批量删除重复事件
+    Batch delete duplicate events
     
-    传入要删除的事件 ID 列表，只会删除属于当前用户的事件。
-    建议先调用 GET /api/events/duplicates 获取重复事件列表，
-    确认后将 delete_ids 传入此接口。
+    Pass in a list of event IDs to delete. Only events belonging to the current user will be deleted.
+    It's recommended to call GET /api/events/duplicates first to get the duplicate event list,
+    then pass delete_ids to this endpoint after confirmation.
     
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     logger.info(f"Deleting duplicate events for user {current_user.username}: {request.event_ids}")
     
-    # 查询要删除的事件（只删除属于当前用户的）
+    # Query events to delete (only delete events belonging to current user)
     events_to_delete = db.query(Event).filter(
         Event.id.in_(request.event_ids),
         Event.user_id == current_user.id,
@@ -233,11 +233,11 @@ async def create_event(
     db: Session = Depends(get_db),
 ):
     """
-    创建新活动
+    Create new event
 
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
-    # 检查是否重复
+    # Check for duplicates
     duplicate = db.query(Event).filter(
         Event.user_id == current_user.id,
         Event.title == request.title,
@@ -248,7 +248,7 @@ async def create_event(
         logger.info(f"Duplicate event detected for user {current_user.username}: {request.title} at {request.start_time}")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"这个日程已经存在了：{duplicate.title}（{duplicate.start_time.strftime('%Y年%m月%d日 %H:%M')}）。需要我帮您修改吗？",
+            detail=f"This event already exists: {duplicate.title} ({duplicate.start_time.strftime('%Y-%m-%d %H:%M')}). Would you like me to modify it?",
         )
     
     event = Event(
@@ -267,7 +267,7 @@ async def create_event(
     db.commit()
     db.refresh(event)
 
-    # 创建事件时返回 ICS 内容
+    # Return ICS content when creating event
     return event_to_response(event, include_ics=True)
 
 
@@ -278,9 +278,9 @@ async def get_event(
     db: Session = Depends(get_db),
 ):
     """
-    获取单个活动详情
+    Get single event details
 
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     logger.debug(f"Getting event {event_id} for user {current_user.username}")
     
@@ -308,9 +308,9 @@ async def update_event_endpoint(
     db: Session = Depends(get_db),
 ):
     """
-    更新活动
+    Update event
 
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     event = db.query(Event).filter(
         Event.id == event_id,
@@ -323,7 +323,7 @@ async def update_event_endpoint(
             detail="Event not found",
         )
 
-    # 更新字段
+    # Update fields
     if request.title is not None:
         event.title = request.title
     if request.start_time is not None:
@@ -350,9 +350,9 @@ async def delete_event_endpoint(
     db: Session = Depends(get_db),
 ):
     """
-    删除活动
+    Delete event
 
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     logger.info(f"Deleting event {event_id} for user {current_user.username}")
     
@@ -383,9 +383,9 @@ async def download_ics(
     db: Session = Depends(get_db),
 ):
     """
-    下载活动的 ICS 文件
+    Download event ICS file
 
-    需要认证：Authorization: Bearer <token>
+    Requires authentication: Authorization: Bearer <token>
     """
     event = db.query(Event).filter(
         Event.id == event_id,
@@ -398,15 +398,15 @@ async def download_ics(
             detail="Event not found",
         )
 
-    # 使用 ICS 服务生成内容
+    # Use ICS service to generate content
     from services.ics_service import generate_ics_bytes
     ics_content = generate_ics_bytes(event)
 
-    # 使用 ASCII 安全的文件名，避免 HTTP 头编码问题
+    # Use ASCII-safe filename to avoid HTTP header encoding issues
     safe_title = "".join(c for c in event.title if c.isascii() and (c.isalnum() or c in " -_")).strip()
     filename = f"{safe_title or 'event'}.ics"
     
-    # 对于包含非 ASCII 字符的标题，使用 RFC 5987 编码
+    # For titles containing non-ASCII characters, use RFC 5987 encoding
     from urllib.parse import quote
     filename_encoded = quote(f"{event.title}.ics", safe="")
 
