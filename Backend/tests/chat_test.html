@@ -166,6 +166,22 @@
         <!-- 状态栏 -->
         <div id="statusBar" class="mt-4 text-sm text-slate-500 text-center"></div>
 
+        <!-- 缩略图查看模态框 -->
+        <div id="thumbnailModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4" onclick="closeThumbnail(event)">
+            <div class="relative max-w-3xl max-h-full">
+                <button 
+                    onclick="closeThumbnail(event)"
+                    class="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors cursor-pointer"
+                >
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                <div id="thumbnailTitle" class="text-white text-center mb-2 font-medium"></div>
+                <img id="thumbnailImage" src="" alt="Event image" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl" />
+            </div>
+        </div>
+
         <!-- 事件列表面板 -->
         <div id="eventsPanel" class="hidden mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-4">
@@ -970,12 +986,24 @@
 
                 eventsList.innerHTML = events.map(event => `
                     <div class="p-4 bg-slate-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2">
+                        <div class="flex items-start gap-3">
+                            ${event.source_thumbnail ? `
+                                <div class="flex-shrink-0">
+                                    <img 
+                                        src="data:image/jpeg;base64,${event.source_thumbnail}" 
+                                        alt="Event thumbnail" 
+                                        class="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onclick="showThumbnail('${event.source_thumbnail}', '${escapeHtml(event.title).replace(/'/g, "\\'")}')"
+                                        title="Click to view larger"
+                                    />
+                                </div>
+                            ` : ''}
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <h3 class="font-medium text-slate-900">${escapeHtml(event.title)}</h3>
                                     ${event.is_followed ? '<span class="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">Followed</span>' : ''}
                                     ${event.recurrence_rule ? '<span class="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">Recurring</span>' : ''}
+                                    ${event.source_thumbnail ? '<span class="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">Has Image</span>' : ''}
                                 </div>
                                 <div class="mt-1 text-sm text-slate-600">
                                     <span class="inline-flex items-center gap-1">
@@ -998,10 +1026,10 @@
                                     </div>
                                 ` : ''}
                                 ${event.description ? `
-                                    <div class="mt-2 text-sm text-slate-500">${escapeHtml(event.description)}</div>
+                                    <div class="mt-2 text-sm text-slate-500 truncate">${escapeHtml(event.description)}</div>
                                 ` : ''}
                             </div>
-                            <div class="flex gap-1 ml-2">
+                            <div class="flex-shrink-0 flex gap-1 ml-2">
                                 <button 
                                     onclick="deleteEvent(${event.id}, '${escapeHtml(event.title).replace(/'/g, "\\'")}');"
                                     class="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
@@ -1077,6 +1105,41 @@
                 minute: '2-digit',
             });
         }
+
+        // Show thumbnail in modal
+        function showThumbnail(base64, title) {
+            const modal = document.getElementById('thumbnailModal');
+            const image = document.getElementById('thumbnailImage');
+            const titleEl = document.getElementById('thumbnailTitle');
+            
+            image.src = `data:image/jpeg;base64,${base64}`;
+            titleEl.textContent = title;
+            modal.classList.remove('hidden');
+            
+            // Prevent body scroll when modal is open
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Close thumbnail modal
+        function closeThumbnail(event) {
+            // Only close if clicking on the backdrop or close button
+            if (event.target.id === 'thumbnailModal' || event.currentTarget.tagName === 'BUTTON') {
+                const modal = document.getElementById('thumbnailModal');
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('thumbnailModal');
+                if (!modal.classList.contains('hidden')) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
+            }
+        });
     </script>
 </body>
 </html>
