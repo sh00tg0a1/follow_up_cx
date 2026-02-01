@@ -1,10 +1,12 @@
 # FollowUP
 
-![Cursor 2-Day AI Hackathon](https://ai-beavers.com/_next/image?url=%2Fimages%2Fhackathon-hero-20012026.png&w=1920&q=75)
+<!-- ![Cursor 2-Day AI Hackathon](https://ai-beavers.com/_next/image?url=%2Fimages%2Fhackathon-hero-20012026.png&w=1920&q=75) -->
 
 > **Never miss a moment that matters.**
 
 FollowUP is an intelligent calendar assistant that helps you achieve Work-Life Balance by automatically extracting events from text, images, and voice inputs. Every meeting, every gathering, every concert deserves your presence.
+
+![FollowUP](./Frontend/followup/assets/images/main_picture.png)
 
 **Capture any event. Add to calendar. Stay on track.**
 
@@ -157,8 +159,8 @@ flowchart TB
 ### Prerequisites
 
 - Python 3.11+
-- Flutter 3.x
 - OpenAI API Key
+- Flutter 3.x (optional; only needed to rebuild the embedded Web UI or run the app natively)
 
 ### Backend
 
@@ -177,9 +179,24 @@ cp .env.example .env
 python main.py
 ```
 
-The API will be available at `http://localhost:8000`. View API docs at `http://localhost:8000/docs`.
+Open the Web UI at `http://localhost:8000`.
+
+The API will be available at `http://localhost:8000/api/*`. View API docs at `http://localhost:8000/docs`.
 
 ### Frontend
+
+The backend can serve the Flutter Web build directly (recommended for demo):
+
+```bash
+# Build Flutter Web (outputs to Frontend/followup/build/web)
+cd Frontend/followup
+flutter build web
+
+# Then run the backend and open:
+# http://localhost:8000
+```
+
+If you want to run Flutter directly (native app development or hot reload):
 
 ```bash
 # Navigate to frontend directory
