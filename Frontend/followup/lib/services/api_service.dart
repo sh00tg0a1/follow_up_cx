@@ -134,13 +134,14 @@ class ApiService {
   }
 
   // 切换关注状态
+  // 使用 PUT /api/events/{id} 接口更新 is_followed 字段
   static Future<EventData> toggleFollow(int id, bool isFollowed) async {
     if (useMock) {
       return MockService.toggleFollow(id, isFollowed);
     }
 
-    final response = await http.patch(
-      Uri.parse("${ApiConfig.baseUrl}/api/events/$id/follow"),
+    final response = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/api/events/$id"),
       headers: await _authHeaders(),
       body: jsonEncode({"is_followed": isFollowed}),
     );
