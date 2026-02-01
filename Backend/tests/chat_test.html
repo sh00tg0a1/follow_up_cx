@@ -145,11 +145,25 @@
         let sessionId = null;
         let selectedFiles = [];
 
-        // 初始化 sessionId 为 token 值
+        // 生成 UUID
+        function generateUUID() {
+            // 使用 crypto.randomUUID() 或回退到手动生成
+            if (crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+            // 回退方案
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // 初始化 sessionId（使用 UUID）
         function initSessionId() {
-            const token = document.getElementById('token').value.trim();
-            if (token && !sessionId) {
-                sessionId = token;
+            if (!sessionId) {
+                sessionId = generateUUID();
+                console.log('Generated new sessionId:', sessionId);
             }
         }
 
@@ -276,9 +290,10 @@
             const token = document.getElementById('token').value.trim();
             const streamMode = document.getElementById('streamMode').checked;
 
-            // 初始化 sessionId（如果尚未初始化，则使用 token）
-            if (!sessionId && token) {
-                sessionId = token;
+            // 初始化 sessionId（如果尚未初始化）
+            if (!sessionId) {
+                sessionId = generateUUID();
+                console.log('Generated new sessionId:', sessionId);
             }
 
             // 验证：必须有消息或文件
@@ -781,8 +796,9 @@
                 });
 
                 if (response.ok) {
-                    // 重置 sessionId 为 token
-                    sessionId = token;
+                    // 重置 sessionId（生成新的 UUID）
+                    sessionId = generateUUID();
+                    console.log('New sessionId after clear:', sessionId);
                     document.getElementById('messages').innerHTML = `
                         <div class="text-center text-slate-400 text-sm py-8">
                             对话已清除

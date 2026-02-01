@@ -105,6 +105,31 @@ class EventListResponse(BaseModel):
     events: List[EventResponse]
 
 
+class DuplicateGroup(BaseModel):
+    """重复事件组"""
+    key: str  # 重复的标识（如 "标题 @ 时间"）
+    events: List[EventResponse]  # 该组中的所有重复事件
+    keep_id: int  # 建议保留的事件 ID（通常是最早创建的）
+    delete_ids: List[int]  # 建议删除的事件 ID 列表
+
+
+class DuplicatesResponse(BaseModel):
+    """重复事件查询响应"""
+    total_duplicates: int  # 重复事件总数（不含保留的）
+    groups: List[DuplicateGroup]  # 重复事件分组
+
+
+class DeleteDuplicatesRequest(BaseModel):
+    """删除重复事件请求"""
+    event_ids: List[int] = Field(..., description="要删除的事件 ID 列表")
+
+
+class DeleteDuplicatesResponse(BaseModel):
+    """删除重复事件响应"""
+    deleted_count: int  # 成功删除的数量
+    deleted_ids: List[int]  # 成功删除的事件 ID
+
+
 # ============ 智能对话相关 ============
 
 class ChatRequest(BaseModel):
@@ -112,7 +137,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="用户消息")
     image_base64: Optional[str] = Field(None, description="可选的单张图片 base64 编码（向后兼容）")
     images_base64: Optional[List[str]] = Field(None, description="可选的多张图片 base64 编码列表")
-    session_id: Optional[str] = Field(None, description="会话ID，用于维护对话上下文")
+    session_id: Optional[str] = Field(None, description="会话ID（可选，不传则后端自动生成）")
 
 
 class ChatResponse(BaseModel):

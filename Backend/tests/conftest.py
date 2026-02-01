@@ -66,7 +66,16 @@ def db():
     
     try:
         yield db
+    except Exception:
+        # 如果测试失败，回滚事务
+        db.rollback()
+        raise
     finally:
+        # 确保事务被关闭
+        try:
+            db.rollback()
+        except Exception:
+            pass
         db.close()
         # 清理表
         Base.metadata.drop_all(bind=test_engine)
@@ -80,8 +89,16 @@ def client(db):
     def override_get_db():
         try:
             yield db
+        except Exception:
+            # 如果请求处理失败，回滚事务
+            db.rollback()
+            raise
         finally:
-            pass
+            # 确保事务被提交或回滚
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
 
     app.dependency_overrides[get_db] = override_get_db
     

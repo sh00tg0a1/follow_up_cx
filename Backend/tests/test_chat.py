@@ -5,6 +5,7 @@
 如果未配置，测试将被跳过。
 """
 import os
+import uuid
 import pytest
 from fastapi import status
 
@@ -20,10 +21,12 @@ skip_without_api_key = pytest.mark.skipif(
 @skip_without_api_key
 def test_chat_success(client, test_user):
     """测试智能对话（成功）"""
+    session_id = str(uuid.uuid4())
     response = client.post(
         "/api/chat",
         json={
             "message": "你好，今天天气怎么样？",
+            "session_id": session_id,
         },
         headers={"Authorization": f"Bearer {test_user['token']}"},
     )
@@ -32,6 +35,7 @@ def test_chat_success(client, test_user):
     assert "message" in data
     assert "intent" in data
     assert "session_id" in data
+    assert data["session_id"] == session_id
     # 闲聊应该返回 chat 意图
     assert data["intent"] in ["chat", "reject"]
 
@@ -39,10 +43,12 @@ def test_chat_success(client, test_user):
 @skip_without_api_key
 def test_chat_create_event_intent(client, test_user):
     """测试创建日程意图识别"""
+    session_id = str(uuid.uuid4())
     response = client.post(
         "/api/chat",
         json={
             "message": "帮我创建一个明天下午3点的会议",
+            "session_id": session_id,
         },
         headers={"Authorization": f"Bearer {test_user['token']}"},
     )
@@ -56,17 +62,20 @@ def test_chat_create_event_intent(client, test_user):
 
 @skip_without_api_key
 def test_chat_with_session(client, test_user):
-    """测试带会话ID的对话"""
+    """测试带会话ID的对话（多轮对话）"""
+    session_id = str(uuid.uuid4())
+    
     # 第一轮对话
     response1 = client.post(
         "/api/chat",
         json={
             "message": "你好",
+            "session_id": session_id,
         },
         headers={"Authorization": f"Bearer {test_user['token']}"},
     )
     assert response1.status_code == status.HTTP_200_OK
-    session_id = response1.json()["session_id"]
+    assert response1.json()["session_id"] == session_id
     
     # 第二轮对话（使用相同 session_id）
     response2 = client.post(
@@ -88,6 +97,7 @@ def test_chat_no_auth(client):
         "/api/chat",
         json={
             "message": "你好",
+            "session_id": str(uuid.uuid4()),
         },
     )
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -99,6 +109,7 @@ def test_chat_empty_message(client, test_user):
         "/api/chat",
         json={
             "message": "",
+            "session_id": str(uuid.uuid4()),
         },
         headers={"Authorization": f"Bearer {test_user['token']}"},
     )
@@ -109,15 +120,18 @@ def test_chat_empty_message(client, test_user):
 @skip_without_api_key
 def test_clear_conversation(client, test_user):
     """测试清除对话历史"""
+    session_id = str(uuid.uuid4())
+    
     # 先创建一个对话
     response1 = client.post(
         "/api/chat",
         json={
             "message": "你好",
+            "session_id": session_id,
         },
         headers={"Authorization": f"Bearer {test_user['token']}"},
     )
-    session_id = response1.json()["session_id"]
+    assert response1.status_code == status.HTTP_200_OK
     
     # 清除对话
     response2 = client.delete(

@@ -5,8 +5,7 @@ LangGraph Agent 实现 - 智能日程助手
 """
 import json
 from datetime import datetime
-from typing import TypedDict, Optional, List, Literal, Annotated
-from operator import add
+from typing import TypedDict, Optional, List
 
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
@@ -14,9 +13,8 @@ from langchain_core.messages import HumanMessage
 from sqlalchemy.orm import Session
 
 from config import settings
-from models import Event, User
+from models import Event
 from logging_config import get_logger
-from services.image_utils import generate_thumbnail
 from .prompts.intent import (
     INTENT_CLASSIFIER_PROMPT,
     CHAT_PROMPT,
@@ -38,6 +36,7 @@ class AgentState(TypedDict):
     # 输入
     message: str
     image_base64: Optional[str]
+    images_base64: Optional[List[str]]  # 多张图片支持
     user_id: int
     conversation_history: str
     
@@ -266,29 +265,6 @@ def handle_create_event(state: AgentState) -> AgentState:
             
             logger.info(f"Created {len(created_events)} event(s) from {len(images_base64)} image(s)")
             
-            # 为创建的事件生成 embedding（仅 PostgreSQL）
-            try:
-                from services.embedding_service import generate_event_embedding, is_postgres
-                from sqlalchemy import text
-                
-                if is_postgres():
-                    for event in created_events:
-                        embedding = generate_event_embedding(
-                            title=event.title,
-                            description=event.description,
-                            location=event.location,
-                        )
-                        if embedding:
-                            embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-                            db.execute(text("""
-                                UPDATE events 
-                                SET embedding = :embedding::vector 
-                                WHERE id = :event_id
-                            """), {"embedding": embedding_str, "event_id": event.id})
-                    db.commit()
-                    logger.debug(f"Generated embeddings for {len(created_events)} events")
-            except Exception as e:
-                logger.warning(f"Failed to generate embeddings: {e}")
             
             # 构建响应
             response_text = ""
@@ -352,7 +328,104 @@ def handle_create_event(state: AgentState) -> AgentState:
             logger.error(f"Failed to parse multiple images: {e}", exc_info=True)
             # 降级到单图片处理
     
-    # 单图片或文本处理（原有逻辑）
+    # 单图片或文本处理
+    # 如果有图片，优先使用专门的图片解析服务
+    if images_base64 and len(images_base64) == 1:
+        logger.info("Using image parsing service for single image")
+        try:
+            from services.llm_service import parse_image_with_llm
+            from services.image_utils import generate_thumbnail
+            
+            # 使用专门的图片解析服务
+            parse_result = parse_image_with_llm(
+                images_base64[0],
+                additional_note=state.get("message", "")
+            )
+            
+            # 如果解析出事件，直接使用
+            if parse_result.events:
+                logger.info(f"Image parsing service extracted {len(parse_result.events)} event(s)")
+                parsed_event = parse_result.events[0]  # 使用第一个事件
+                
+                # 检查是否重复
+                duplicate = check_duplicate_event(
+                    db, state["user_id"], parsed_event.title, parsed_event.start_time
+                )
+                if duplicate:
+                    logger.info(f"Duplicate event detected: {parsed_event.title} at {parsed_event.start_time}")
+                    return {
+                        **state,
+                        "response": f"⚠️ 这个日程已经存在了：**{duplicate.title}**（{duplicate.start_time.strftime('%Y年%m月%d日 %H:%M')}）。需要我帮您修改吗？",
+                        "action_result": {
+                            "action": "create_event",
+                            "duplicate": True,
+                            "existing_event_id": duplicate.id,
+                            "existing_event_title": duplicate.title,
+                        },
+                    }
+                
+                # 创建事件
+                event = Event(
+                    user_id=state["user_id"],
+                    title=parsed_event.title,
+                    start_time=parsed_event.start_time,
+                    end_time=parsed_event.end_time,
+                    location=parsed_event.location,
+                    description=parsed_event.description,
+                    source_type="image",
+                    source_thumbnail=generate_thumbnail(images_base64[0]),
+                    is_followed=True,
+                )
+                db.add(event)
+                db.commit()
+                db.refresh(event)
+                
+                logger.info(f"Created event from image: {event.title} (id={event.id})")
+                
+                # 生成 ICS 文件内容
+                from services.ics_service import generate_ics_content
+                ics_content = generate_ics_content(event)
+                
+                # 构建响应
+                response_text = f"好的，我已经为您创建了日程：\n\n"
+                response_text += f"📅 **{event.title}**\n"
+                response_text += f"⏰ 时间：{event.start_time.strftime('%Y年%m月%d日 %H:%M')}"
+                if event.end_time:
+                    response_text += f" - {event.end_time.strftime('%H:%M')}"
+                response_text += "\n"
+                if event.location:
+                    response_text += f"📍 地点：{event.location}\n"
+                if event.description:
+                    response_text += f"📝 描述：{event.description}\n"
+                
+                return {
+                    **state,
+                    "response": response_text,
+                    "action_result": {
+                        "action": "create_event",
+                        "event_id": event.id,
+                        "event_title": event.title,
+                        "ics_content": ics_content,
+                        "ics_download_url": f"/api/events/{event.id}/ics",
+                    },
+                }
+            
+            # 如果需要澄清，返回澄清问题
+            if parse_result.needs_clarification and parse_result.clarification_question:
+                logger.info("Image parsing requires clarification")
+                return {
+                    **state,
+                    "response": parse_result.clarification_question,
+                    "action_result": {"action": "create_event", "need_more_info": True},
+                }
+            
+            # 如果没有解析出事件且不需要澄清，继续使用文本提取
+            logger.warning("Image parsing service returned no events, falling back to text extraction")
+        except Exception as e:
+            logger.warning(f"Image parsing service failed: {e}, falling back to text extraction", exc_info=True)
+            # 继续使用文本提取逻辑
+    
+    # 文本提取逻辑（无图片或图片解析失败后的降级方案）
     llm = get_llm()
     current_time = datetime.now().isoformat()
     
@@ -392,6 +465,10 @@ def handle_create_event(state: AgentState) -> AgentState:
         
         event_data = json.loads(content.strip())
         
+        # 检查必要字段
+        if "start_time" not in event_data or not event_data["start_time"]:
+            raise ValueError("Missing required field: start_time")
+        
         title = event_data.get("title", "新日程")
         start_time = datetime.fromisoformat(event_data["start_time"])
         
@@ -421,36 +498,12 @@ def handle_create_event(state: AgentState) -> AgentState:
             source_type="agent",
             is_followed=True,
         )
-        # 检查数据库是否有 embedding 列，如果没有则从实例中移除该属性
-        Event.remove_embedding_if_not_exists(db, event)
         db.add(event)
         db.commit()
         db.refresh(event)
         
         logger.info(f"Created event: {event.title} (id={event.id})")
         
-        # 生成 embedding（仅 PostgreSQL）
-        try:
-            from services.embedding_service import generate_event_embedding, is_postgres
-            from sqlalchemy import text
-            
-            if is_postgres():
-                embedding = generate_event_embedding(
-                    title=event.title,
-                    description=event.description,
-                    location=event.location,
-                )
-                if embedding:
-                    embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-                    db.execute(text("""
-                        UPDATE events 
-                        SET embedding = :embedding::vector 
-                        WHERE id = :event_id
-                    """), {"embedding": embedding_str, "event_id": event.id})
-                    db.commit()
-                    logger.debug(f"Generated embedding for event {event.id}")
-        except Exception as e:
-            logger.warning(f"Failed to generate embedding for event {event.id}: {e}")
         
         # 生成 ICS 文件内容
         from services.ics_service import generate_ics_content
@@ -480,18 +533,48 @@ def handle_create_event(state: AgentState) -> AgentState:
             },
         }
         
-    except Exception as e:
-        logger.error(f"Failed to create event: {e}")
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON from LLM response: {e}")
+        logger.debug(f"LLM response content: {response.content[:500] if 'response' in locals() else 'N/A'}")
         
         has_image = state.get("image_base64") or state.get("images_base64")
         if has_image:
-            response = "我看到了您上传的图片，但我需要更多信息来创建日程。\n\n请告诉我：\n📅 这个活动是什么时候？\n📍 在哪里举办？\n📝 还有其他需要记录的信息吗？"
+            response_text = "我看到了您上传的图片，但无法从中提取完整的日程信息。\n\n请告诉我：\n📅 这个活动是什么时候？\n📍 在哪里举办？\n📝 还有其他需要记录的信息吗？"
         else:
-            response = "我想帮您创建日程，但需要更多信息。\n\n请告诉我：\n📅 什么时候？（如：明天下午3点）\n📝 什么活动？（如：团队会议）\n📍 在哪里？（可选）"
+            response_text = "我想帮您创建日程，但需要更多信息。\n\n请告诉我：\n📅 什么时候？（如：明天下午3点）\n📝 什么活动？（如：团队会议）\n📍 在哪里？（可选）"
         
         return {
             **state,
-            "response": response,
+            "response": response_text,
+            "action_result": {"action": "create_event", "need_more_info": True},
+        }
+    except (KeyError, ValueError) as e:
+        logger.error(f"Failed to extract event data: {e}")
+        logger.debug(f"Event data: {event_data if 'event_data' in locals() else 'N/A'}")
+        
+        has_image = state.get("image_base64") or state.get("images_base64")
+        if has_image:
+            response_text = "我看到了您上传的图片，但缺少一些必要信息来创建日程。\n\n请告诉我：\n📅 这个活动是什么时候？（这是必填信息）\n📍 在哪里举办？\n📝 还有其他需要记录的信息吗？"
+        else:
+            response_text = "我想帮您创建日程，但缺少必要信息。\n\n请告诉我：\n📅 什么时候？（这是必填信息，如：明天下午3点）\n📝 什么活动？（如：团队会议）\n📍 在哪里？（可选）"
+        
+        return {
+            **state,
+            "response": response_text,
+            "action_result": {"action": "create_event", "need_more_info": True},
+        }
+    except Exception as e:
+        logger.error(f"Failed to create event: {e}", exc_info=True)
+        
+        has_image = state.get("image_base64") or state.get("images_base64")
+        if has_image:
+            response_text = "我看到了您上传的图片，但在处理时遇到了问题。\n\n请告诉我：\n📅 这个活动是什么时候？\n📍 在哪里举办？\n📝 还有其他需要记录的信息吗？"
+        else:
+            response_text = "我想帮您创建日程，但需要更多信息。\n\n请告诉我：\n📅 什么时候？（如：明天下午3点）\n📝 什么活动？（如：团队会议）\n📍 在哪里？（可选）"
+        
+        return {
+            **state,
+            "response": response_text,
             "action_result": {"action": "create_event", "need_more_info": True},
         }
 
@@ -703,69 +786,15 @@ def handle_delete_event(state: AgentState) -> AgentState:
 
 
 def handle_query_event(state: AgentState) -> AgentState:
-    """处理查询日程（支持向量语义搜索）"""
+    """处理查询日程"""
     logger.debug("Handling query event...")
     
     db = state["db"]
     user_id = state["user_id"]
     message = state["message"]
     
-    # 尝试使用向量搜索（仅 PostgreSQL）
-    events = []
-    used_vector_search = False
-    
-    try:
-        from services.embedding_service import is_postgres, generate_embedding
-        from sqlalchemy import text
-        
-        if is_postgres():
-            # 生成查询的 embedding
-            query_embedding = generate_embedding(message)
-            
-            if query_embedding:
-                # 向量相似度搜索
-                embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
-                
-                result = db.execute(text("""
-                    SELECT 
-                        id, title, start_time, end_time, location, description,
-                        source_type, source_thumbnail, is_followed, created_at,
-                        1 - (embedding <=> :embedding::vector) as similarity
-                    FROM events
-                    WHERE user_id = :user_id
-                        AND embedding IS NOT NULL
-                    ORDER BY embedding <=> :embedding::vector
-                    LIMIT 20
-                """), {
-                    "embedding": embedding_str,
-                    "user_id": user_id,
-                })
-                
-                rows = result.fetchall()
-                for row in rows:
-                    events.append(Event(
-                        id=row.id,
-                        title=row.title,
-                        start_time=row.start_time,
-                        end_time=row.end_time,
-                        location=row.location,
-                        description=row.description,
-                        source_type=row.source_type,
-                        source_thumbnail=row.source_thumbnail,
-                        is_followed=row.is_followed,
-                        created_at=row.created_at,
-                        user_id=user_id,
-                    ))
-                
-                if events:
-                    used_vector_search = True
-                    logger.info(f"Vector search found {len(events)} events")
-    except Exception as e:
-        logger.warning(f"Vector search failed, falling back to normal query: {e}")
-    
-    # 如果向量搜索没有结果，使用普通查询
-    if not events:
-        events = db.query(Event).filter(Event.user_id == user_id).order_by(Event.start_time).all()
+    # 使用普通查询
+    events = db.query(Event).filter(Event.user_id == user_id).order_by(Event.start_time).all()
     
     if not events:
         return {
@@ -798,8 +827,7 @@ def handle_query_event(state: AgentState) -> AgentState:
     
     response = llm.invoke(prompt)
     
-    search_method = "vector" if used_vector_search else "normal"
-    logger.info(f"Query event completed: found {len(events)} events (search={search_method})")
+    logger.info(f"Query event completed: found {len(events)} events")
     
     return {
         **state,
@@ -807,7 +835,6 @@ def handle_query_event(state: AgentState) -> AgentState:
         "action_result": {
             "action": "query_event",
             "events_count": len(events),
-            "search_method": search_method,
             "events": [
                 {
                     "id": e.id,

@@ -89,17 +89,16 @@ def parse_text_with_llm(
         
         # 构建 prompt
         current_time = datetime.now().isoformat()
-        prompt = TEXT_PARSE_PROMPT.format_messages(
-            current_time=current_time,
-            text=text,
-            additional_note=additional_note or "",
-        )
         
         logger.debug(f"Calling LLM API (model={settings.OPENAI_MODEL})")
         
         # 调用 LLM
-        chain = prompt | llm | parser
-        result = chain.invoke({})
+        chain = TEXT_PARSE_PROMPT | llm | parser
+        result = chain.invoke({
+            "current_time": current_time,
+            "text": text,
+            "additional_note": additional_note or "",
+        })
         
         elapsed = time.time() - start_time
         logger.info(f"LLM API call completed in {elapsed:.2f}s")

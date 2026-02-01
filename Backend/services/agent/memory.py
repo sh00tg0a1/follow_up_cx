@@ -22,7 +22,7 @@ class ConversationMemory:
         Args:
             db: 数据库会话
             user_id: 用户 ID
-            session_id: 会话 ID，如果为 None 则创建新会话
+            session_id: 会话 ID（可选，不传则自动生成）
         """
         self.db = db
         self.user_id = user_id

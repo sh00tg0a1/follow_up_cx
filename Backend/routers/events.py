@@ -15,6 +15,10 @@ from schemas import (
     EventUpdate,
     EventResponse,
     EventListResponse,
+    DuplicateGroup,
+    DuplicatesResponse,
+    DeleteDuplicatesRequest,
+    DeleteDuplicatesResponse,
 )
 from auth import get_current_user
 from database import get_db
@@ -26,8 +30,22 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/events", tags=["活动管理"])
 
 
-def event_to_response(event: Event) -> EventResponse:
-    """将数据库模型转换为响应模型"""
+def event_to_response(event: Event, include_ics: bool = False) -> EventResponse:
+    """
+    将数据库模型转换为响应模型
+    
+    Args:
+        event: Event 模型实例
+        include_ics: 是否包含 ICS 文件内容
+    """
+    ics_content = None
+    ics_download_url = None
+    
+    if include_ics:
+        from services.ics_service import generate_ics_content
+        ics_content = generate_ics_content(event)
+        ics_download_url = f"/api/events/{event.id}/ics"
+    
     return EventResponse(
         id=event.id,
         title=event.title,
@@ -39,6 +57,8 @@ def event_to_response(event: Event) -> EventResponse:
         source_thumbnail=event.source_thumbnail,
         is_followed=event.is_followed,
         created_at=event.created_at,
+        ics_content=ics_content,
+        ics_download_url=ics_download_url,
     )
 
 
@@ -76,82 +96,133 @@ async def search_events(
     db: Session = Depends(get_db),
 ):
     """
-    搜索活动（支持向量语义搜索）
-    
-    在 PostgreSQL 环境下使用向量相似度搜索，
-    在 SQLite 环境下降级为 LIKE 文本搜索。
+    搜索活动（使用文本搜索）
 
     需要认证：Authorization: Bearer <token>
     """
-    from services.embedding_service import is_postgres, generate_embedding
-    from sqlalchemy import text, or_
+    from sqlalchemy import or_
     
     logger.info(f"Searching events for user {current_user.username}: '{q}' (limit={limit})")
     
-    events = []
+    # 使用 LIKE 文本搜索
+    search_pattern = f"%{q}%"
+    events = db.query(Event).filter(
+        Event.user_id == current_user.id,
+        or_(
+            Event.title.ilike(search_pattern),
+            Event.description.ilike(search_pattern),
+            Event.location.ilike(search_pattern),
+        )
+    ).order_by(Event.start_time).limit(limit).all()
     
-    if is_postgres():
-        # PostgreSQL: 使用向量相似度搜索
-        query_embedding = generate_embedding(q)
-        
-        if query_embedding:
-            # 向量搜索
-            embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
-            
-            result = db.execute(text(f"""
-                SELECT 
-                    id, title, start_time, end_time, location, description,
-                    source_type, source_thumbnail, is_followed, created_at,
-                    1 - (embedding <=> :embedding::vector) as similarity
-                FROM events
-                WHERE user_id = :user_id
-                    AND embedding IS NOT NULL
-                ORDER BY embedding <=> :embedding::vector
-                LIMIT :limit
-            """), {
-                "embedding": embedding_str,
-                "user_id": current_user.id,
-                "limit": limit,
-            })
-            
-            rows = result.fetchall()
-            for row in rows:
-                events.append(Event(
-                    id=row.id,
-                    title=row.title,
-                    start_time=row.start_time,
-                    end_time=row.end_time,
-                    location=row.location,
-                    description=row.description,
-                    source_type=row.source_type,
-                    source_thumbnail=row.source_thumbnail,
-                    is_followed=row.is_followed,
-                    created_at=row.created_at,
-                    user_id=current_user.id,
-                ))
-            
-            logger.info(f"Vector search found {len(events)} event(s)")
-        else:
-            # 无法生成 embedding，降级到文本搜索
-            logger.warning("Failed to generate embedding, falling back to text search")
-    
-    # 如果向量搜索没有结果或不支持，使用文本搜索
-    if not events:
-        # SQLite 或降级：使用 LIKE 文本搜索
-        search_pattern = f"%{q}%"
-        events = db.query(Event).filter(
-            Event.user_id == current_user.id,
-            or_(
-                Event.title.ilike(search_pattern),
-                Event.description.ilike(search_pattern),
-                Event.location.ilike(search_pattern),
-            )
-        ).order_by(Event.start_time).limit(limit).all()
-        
-        logger.info(f"Text search found {len(events)} event(s)")
+    logger.info(f"Text search found {len(events)} event(s)")
     
     return EventListResponse(
         events=[event_to_response(e) for e in events]
+    )
+
+
+@router.get("/duplicates", response_model=DuplicatesResponse)
+async def find_duplicates(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    查询用户的重复事件
+    
+    重复定义：标题相同且开始时间相同的事件
+    
+    返回分组的重复事件列表，每组包含：
+    - key: 重复标识
+    - events: 该组所有重复事件
+    - keep_id: 建议保留的事件 ID（最早创建的）
+    - delete_ids: 建议删除的事件 ID 列表
+    
+    需要认证：Authorization: Bearer <token>
+    """
+    from sqlalchemy import func
+    from collections import defaultdict
+    
+    logger.info(f"Finding duplicate events for user {current_user.username}")
+    
+    # 查询所有事件
+    all_events = db.query(Event).filter(
+        Event.user_id == current_user.id
+    ).order_by(Event.created_at).all()
+    
+    # 按 (title, start_time) 分组
+    groups_dict = defaultdict(list)
+    for event in all_events:
+        key = (event.title, event.start_time)
+        groups_dict[key].append(event)
+    
+    # 过滤出有重复的组
+    duplicate_groups = []
+    total_duplicates = 0
+    
+    for (title, start_time), events in groups_dict.items():
+        if len(events) > 1:
+            # 有重复
+            key_str = f"{title} @ {start_time.strftime('%Y-%m-%d %H:%M')}"
+            
+            # 按创建时间排序，保留最早的
+            sorted_events = sorted(events, key=lambda e: e.created_at)
+            keep_event = sorted_events[0]
+            delete_events = sorted_events[1:]
+            
+            duplicate_groups.append(DuplicateGroup(
+                key=key_str,
+                events=[event_to_response(e) for e in sorted_events],
+                keep_id=keep_event.id,
+                delete_ids=[e.id for e in delete_events],
+            ))
+            
+            total_duplicates += len(delete_events)
+    
+    logger.info(f"Found {len(duplicate_groups)} duplicate group(s), {total_duplicates} event(s) to delete")
+    
+    return DuplicatesResponse(
+        total_duplicates=total_duplicates,
+        groups=duplicate_groups,
+    )
+
+
+@router.delete("/duplicates", response_model=DeleteDuplicatesResponse)
+async def delete_duplicates(
+    request: DeleteDuplicatesRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    批量删除重复事件
+    
+    传入要删除的事件 ID 列表，只会删除属于当前用户的事件。
+    建议先调用 GET /api/events/duplicates 获取重复事件列表，
+    确认后将 delete_ids 传入此接口。
+    
+    需要认证：Authorization: Bearer <token>
+    """
+    logger.info(f"Deleting duplicate events for user {current_user.username}: {request.event_ids}")
+    
+    # 查询要删除的事件（只删除属于当前用户的）
+    events_to_delete = db.query(Event).filter(
+        Event.id.in_(request.event_ids),
+        Event.user_id == current_user.id,
+    ).all()
+    
+    deleted_ids = []
+    for event in events_to_delete:
+        logger.debug(f"Deleting duplicate event {event.id}: {event.title}")
+        db.delete(event)
+        deleted_ids.append(event.id)
+    
+    db.commit()
+    
+    logger.info(f"Deleted {len(deleted_ids)} duplicate event(s)")
+    
+    return DeleteDuplicatesResponse(
+        deleted_count=len(deleted_ids),
+        deleted_ids=deleted_ids,
     )
 
 
@@ -166,8 +237,6 @@ async def create_event(
 
     需要认证：Authorization: Bearer <token>
     """
-    from services.embedding_service import generate_event_embedding, is_postgres
-    
     # 检查是否重复
     duplicate = db.query(Event).filter(
         Event.user_id == current_user.id,
@@ -179,7 +248,7 @@ async def create_event(
         logger.info(f"Duplicate event detected for user {current_user.username}: {request.title} at {request.start_time}")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"这个日程已经存在了：{duplicate.title}（{duplicate.start_time.strftime('%Y年%m月%d日 %H:%M')}）",
+            detail=f"这个日程已经存在了：{duplicate.title}（{duplicate.start_time.strftime('%Y年%m月%d日 %H:%M')}）。需要我帮您修改吗？",
         )
     
     event = Event(
@@ -194,33 +263,9 @@ async def create_event(
         is_followed=request.is_followed,
     )
     
-    # 检查数据库是否有 embedding 列，如果没有则从实例中移除该属性
-    Event.remove_embedding_if_not_exists(db, event)
-
     db.add(event)
     db.commit()
     db.refresh(event)
-    
-    # 生成 embedding（仅 PostgreSQL）
-    if is_postgres():
-        try:
-            embedding = generate_event_embedding(
-                title=request.title,
-                description=request.description,
-                location=request.location,
-            )
-            if embedding:
-                from sqlalchemy import text
-                embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-                db.execute(text("""
-                    UPDATE events 
-                    SET embedding = :embedding::vector 
-                    WHERE id = :event_id
-                """), {"embedding": embedding_str, "event_id": event.id})
-                db.commit()
-                logger.debug(f"Generated embedding for event {event.id}")
-        except Exception as e:
-            logger.warning(f"Failed to generate embedding for event {event.id}: {e}")
 
     # 创建事件时返回 ICS 内容
     return event_to_response(event, include_ics=True)
@@ -278,52 +323,22 @@ async def update_event_endpoint(
             detail="Event not found",
         )
 
-    # 记录是否有内容字段变更（需要重新生成 embedding）
-    content_changed = False
-    
     # 更新字段
     if request.title is not None:
         event.title = request.title
-        content_changed = True
     if request.start_time is not None:
         event.start_time = request.start_time
     if request.end_time is not None:
         event.end_time = request.end_time
     if request.location is not None:
         event.location = request.location
-        content_changed = True
     if request.description is not None:
         event.description = request.description
-        content_changed = True
     if request.is_followed is not None:
         event.is_followed = request.is_followed
 
     db.commit()
     db.refresh(event)
-    
-    # 如果内容字段变更，重新生成 embedding（仅 PostgreSQL）
-    if content_changed:
-        from services.embedding_service import generate_event_embedding, is_postgres
-        
-        if is_postgres():
-            try:
-                embedding = generate_event_embedding(
-                    title=event.title,
-                    description=event.description,
-                    location=event.location,
-                )
-                if embedding:
-                    from sqlalchemy import text
-                    embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-                    db.execute(text("""
-                        UPDATE events 
-                        SET embedding = :embedding::vector 
-                        WHERE id = :event_id
-                    """), {"embedding": embedding_str, "event_id": event.id})
-                    db.commit()
-                    logger.debug(f"Updated embedding for event {event.id}")
-            except Exception as e:
-                logger.warning(f"Failed to update embedding for event {event.id}: {e}")
 
     return event_to_response(event)
 

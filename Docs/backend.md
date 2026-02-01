@@ -323,6 +323,66 @@ POST /api/chat
 
 ---
 
+#### GET /api/events/duplicates
+查询用户的重复事件
+
+**Header**: `Authorization: Bearer <token>`
+
+**响应 200**:
+```json
+{
+  "total_duplicates": 2,
+  "groups": [
+    {
+      "key": "团队会议 @ 2026-02-05 14:00",
+      "events": [
+        {"id": 1, "title": "团队会议", "start_time": "2026-02-05T14:00:00", "...": "..."},
+        {"id": 5, "title": "团队会议", "start_time": "2026-02-05T14:00:00", "...": "..."}
+      ],
+      "keep_id": 1,
+      "delete_ids": [5]
+    }
+  ]
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| total_duplicates | 建议删除的重复事件总数 |
+| groups[].key | 重复事件的标识（标题 @ 时间） |
+| groups[].events | 该组所有重复事件 |
+| groups[].keep_id | 建议保留的事件 ID（最早创建的） |
+| groups[].delete_ids | 建议删除的事件 ID 列表 |
+
+---
+
+#### DELETE /api/events/duplicates
+批量删除重复事件
+
+**Header**: `Authorization: Bearer <token>`
+
+**请求体**:
+```json
+{
+  "event_ids": [5, 8]
+}
+```
+
+**响应 200**:
+```json
+{
+  "deleted_count": 2,
+  "deleted_ids": [5, 8]
+}
+```
+
+> **使用流程**：
+> 1. 调用 `GET /api/events/duplicates` 获取重复事件列表
+> 2. 前端展示给用户确认
+> 3. 用户确认后，将 `delete_ids` 传入 `DELETE /api/events/duplicates`
+
+---
+
 ### 1.5 健康检查
 
 #### GET /api/health

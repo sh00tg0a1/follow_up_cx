@@ -21,7 +21,7 @@ Content-Type: application/json
   "message": "你好，今天天气怎么样？",
   "image_base64": "base64-string",  // 可选：单张图片（向后兼容）
   "images_base64": ["base64-1", "base64-2"],  // 可选：多张图片
-  "session_id": "optional-session-id"
+  "session_id": "optional-session-id"  // 可选：不传则后端自动生成
 }
 ```
 
@@ -31,7 +31,7 @@ Content-Type: application/json
 | message | string | 是 | 用户消息内容 |
 | image_base64 | string | 否 | 单张图片 base64 编码（向后兼容） |
 | images_base64 | array[string] | 否 | 多张图片 base64 编码列表 |
-| session_id | string | 否 | 会话ID，用于多轮对话 |
+| session_id | string | 否 | 会话ID（可选，不传则后端自动生成） |
 
 **注意**：
 - `image_base64` 和 `images_base64` 可以同时使用，但 `images_base64` 优先级更高
@@ -72,7 +72,7 @@ Content-Type: application/json
   "message": "你好",
   "image_base64": "base64-string",  // 可选：单张图片
   "images_base64": ["base64-1", "base64-2"],  // 可选：多张图片
-  "session_id": "optional-session-id"
+  "session_id": "optional-session-id"  // 可选：不传则后端自动生成
 }
 ```
 
@@ -560,69 +560,3 @@ curl -N -X POST "http://localhost:8000/api/chat?stream=true" \
 - ✅ Thinking 状态显示
 
 `-N` 参数禁用缓冲，可以看到实时输出。
-
-## 向量搜索功能
-
-### 概述
-
-Chat Agent 和 Events API 支持基于向量的语义搜索，可以用自然语言查询日程。
-
-### 环境要求
-
-| 环境 | 数据库 | 向量搜索 |
-|------|--------|----------|
-| 开发 | SQLite | 降级为 LIKE 文本搜索 |
-| 生产 | PostgreSQL + pgvector | 向量相似度搜索 |
-
-### API 端点
-
-```http
-GET /api/events/search?q=开会相关的日程&limit=10
-Authorization: Bearer <token>
-```
-
-**参数**:
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| q | string | 是 | 搜索查询（自然语言） |
-| limit | int | 否 | 返回结果数量（默认 10，最大 50） |
-
-**响应**: 与 `GET /api/events` 相同格式
-
-### 工作原理
-
-1. **Embedding 生成**：使用 OpenAI `text-embedding-3-small` 模型
-2. **向量维度**：1536 维
-3. **相似度计算**：余弦相似度（cosine similarity）
-4. **自动 Embedding**：创建/更新日程时自动生成 embedding
-
-### Chat Agent 集成
-
-当用户通过 Chat 接口查询日程时（`query_event` 意图），Agent 会：
-
-1. 在 PostgreSQL 环境下使用向量搜索找到语义相关的日程
-2. 在 SQLite 环境下降级为普通查询
-3. 用 LLM 根据搜索结果生成自然语言回复
-
-**示例对话**:
-```
-用户: 我有哪些和产品相关的会议？
-Agent: [使用向量搜索找到相关日程]
-       您有以下与产品相关的会议：
-       1. 产品评审会 - 2月5日 10:00
-       2. 产品需求讨论 - 2月7日 14:30
-```
-
-### PostgreSQL 配置
-
-生产环境需要安装 pgvector 扩展：
-
-```sql
--- 需要 PostgreSQL 管理员权限
-CREATE EXTENSION IF NOT EXISTS vector;
-```
-
-迁移脚本会自动：
-1. 启用 pgvector 扩展
-2. 添加 embedding 列
-3. 创建向量索引（当数据量 >= 100 时）
