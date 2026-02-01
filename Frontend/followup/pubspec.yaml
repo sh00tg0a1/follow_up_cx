@@ -60,6 +60,9 @@ dependencies:
   
   # 获取应用信息
   package_info_plus: ^8.0.0
+  
+  # Markdown 渲染
+  flutter_markdown: ^0.7.6
 
 dev_dependencies:
   flutter_test:

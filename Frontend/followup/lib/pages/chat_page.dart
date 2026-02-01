@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -616,12 +617,38 @@ class _ChatPageState extends State<ChatPage> {
                 ],
               ),
               child: _currentResponse.isNotEmpty
-                  ? SelectableText(
-                      _currentResponse,
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 15,
-                        height: 1.5,
+                  ? MarkdownBody(
+                      data: _currentResponse,
+                      selectable: true,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                          height: 1.5,
+                        ),
+                        strong: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        em: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        listBullet: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                        ),
+                        code: TextStyle(
+                          color: AppColors.primary,
+                          backgroundColor: AppColors.surface,
+                          fontSize: 14,
+                        ),
+                        codeblockDecoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     )
                   : _currentThinkingMessage != null
@@ -1102,18 +1129,57 @@ class _ChatBubble extends StatelessWidget {
                   ],
                   // Display text content (hide auto-generated image message)
                   if (!message.content.startsWith('📷'))
-                    SelectableText(
-                      message.content,
-                      style: TextStyle(
-                        color: isUser 
-                            ? Colors.white 
-                            : message.isError 
-                                ? AppColors.error 
-                                : AppColors.textPrimary,
-                        fontSize: 15,
-                        height: 1.5,
-                      ),
-                    ),
+                    isUser
+                        ? SelectableText(
+                            message.content,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              height: 1.5,
+                            ),
+                          )
+                        : MarkdownBody(
+                            data: message.content,
+                            selectable: true,
+                            styleSheet: MarkdownStyleSheet(
+                              p: TextStyle(
+                                color: message.isError 
+                                    ? AppColors.error 
+                                    : AppColors.textPrimary,
+                                fontSize: 15,
+                                height: 1.5,
+                              ),
+                              strong: TextStyle(
+                                color: message.isError 
+                                    ? AppColors.error 
+                                    : AppColors.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              em: TextStyle(
+                                color: message.isError 
+                                    ? AppColors.error 
+                                    : AppColors.textPrimary,
+                                fontSize: 15,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              listBullet: TextStyle(
+                                color: message.isError 
+                                    ? AppColors.error 
+                                    : AppColors.textPrimary,
+                                fontSize: 15,
+                              ),
+                              code: TextStyle(
+                                color: AppColors.primary,
+                                backgroundColor: AppColors.surface,
+                                fontSize: 14,
+                              ),
+                              codeblockDecoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
                   // ICS Download button when event is created
                   if (!isUser && _hasIcsContent(message.actionResult)) ...[
                     const SizedBox(height: 12),
