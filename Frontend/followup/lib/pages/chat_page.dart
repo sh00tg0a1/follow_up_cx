@@ -5,7 +5,9 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:universal_html/html.dart' as html;
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
@@ -1078,6 +1080,11 @@ class _ChatBubble extends StatelessWidget {
                         height: 1.5,
                       ),
                     ),
+                  // ICS Download button when event is created
+                  if (!isUser && _hasIcsContent(message.actionResult)) ...[
+                    const SizedBox(height: 12),
+                    _buildIcsDownloadButton(context, message.actionResult!),
+                  ],
                 ],
               ),
             ),
@@ -1093,6 +1100,115 @@ class _ChatBubble extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Check if actionResult contains ICS content
+  bool _hasIcsContent(Map<String, dynamic>? actionResult) {
+    if (actionResult == null) return false;
+    // Check for single event ICS
+    if (actionResult['ics_content'] != null) return true;
+    // Check for multiple events with ICS
+    final events = actionResult['events'] as List<dynamic>?;
+    if (events != null && events.isNotEmpty) {
+      return events.any((e) => e['ics_content'] != null);
+    }
+    return false;
+  }
+
+  /// Build ICS download button
+  Widget _buildIcsDownloadButton(BuildContext context, Map<String, dynamic> actionResult) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _downloadIcs(context, actionResult),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.calendar_today_outlined,
+                size: 16,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Add to Calendar',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Download ICS file
+  Future<void> _downloadIcs(BuildContext context, Map<String, dynamic> actionResult) async {
+    try {
+      String? icsBase64;
+      String title = 'event';
+
+      // Get ICS content from single event or first event in list
+      if (actionResult['ics_content'] != null) {
+        icsBase64 = actionResult['ics_content'] as String;
+        title = actionResult['event_title'] as String? ?? 'event';
+      } else {
+        final events = actionResult['events'] as List<dynamic>?;
+        if (events != null && events.isNotEmpty) {
+          final firstEvent = events.first as Map<String, dynamic>;
+          icsBase64 = firstEvent['ics_content'] as String?;
+          title = firstEvent['title'] as String? ?? 'event';
+        }
+      }
+
+      if (icsBase64 == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No calendar file available')),
+        );
+        return;
+      }
+
+      final icsBytes = base64Decode(icsBase64);
+      final filename = '${title.replaceAll(RegExp(r'[^\w\s]'), '')}.ics';
+
+      if (kIsWeb) {
+        // Web platform download
+        final blob = html.Blob([icsBytes], 'text/calendar');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute('download', filename)
+          ..click();
+        html.Url.revokeObjectUrl(url);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Calendar file downloaded')),
+        );
+      } else {
+        // Mobile platform save file
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/$filename');
+        await file.writeAsBytes(icsBytes);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Saved to ${file.path}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Download failed: $e')),
+      );
+    }
   }
 
   /// Build images grid in message bubble
