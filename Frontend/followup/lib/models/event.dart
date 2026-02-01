@@ -117,10 +117,14 @@ class EventData {
 class ParseResponse {
   final List<EventData> events;
   final String parseId;
+  final bool needsClarification; // 是否需要用户澄清信息
+  final String? clarificationQuestion; // 澄清问题
 
   ParseResponse({
     required this.events,
     required this.parseId,
+    this.needsClarification = false,
+    this.clarificationQuestion,
   });
 
   factory ParseResponse.fromJson(Map<String, dynamic> json) {
@@ -129,6 +133,8 @@ class ParseResponse {
           .map((e) => EventData.fromJson(e as Map<String, dynamic>))
           .toList(),
       parseId: json['parse_id'] as String,
+      needsClarification: json['needs_clarification'] as bool? ?? false,
+      clarificationQuestion: json['clarification_question'] as String?,
     );
   }
 }
