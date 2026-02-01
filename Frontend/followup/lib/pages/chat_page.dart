@@ -1115,35 +1115,67 @@ class _ChatBubble extends StatelessWidget {
     return false;
   }
 
-  /// Build ICS download button
+  /// Build action buttons (ICS download + View Events)
   Widget _buildIcsDownloadButton(BuildContext context, Map<String, dynamic> actionResult) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        // Add to Calendar button
+        _buildActionButton(
+          context: context,
+          icon: Icons.calendar_today_outlined,
+          label: 'Add to Calendar',
+          onTap: () => _downloadIcs(context, actionResult),
+        ),
+        // View Saved button
+        _buildActionButton(
+          context: context,
+          icon: Icons.event_note_outlined,
+          label: 'View Saved',
+          onTap: () => Navigator.pushNamed(context, '/events'),
+          isSecondary: true,
+        ),
+      ],
+    );
+  }
+
+  /// Build a single action button
+  Widget _buildActionButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isSecondary = false,
+  }) {
+    final color = isSecondary ? AppColors.textSecondary : AppColors.primary;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _downloadIcs(context, actionResult),
+        onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.3),
+              color: color.withValues(alpha: 0.3),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.calendar_today_outlined,
+                icon,
                 size: 16,
-                color: AppColors.primary,
+                color: color,
               ),
               const SizedBox(width: 6),
               Text(
-                'Add to Calendar',
+                label,
                 style: TextStyle(
-                  color: AppColors.primary,
+                  color: color,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
