@@ -27,6 +27,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _isTyping = false;
   String _currentResponse = '';
   String? _currentIntent;
+  String? _currentThinkingMessage;  // Thinking/status message to display
   Map<String, dynamic>? _currentActionResult;
   StreamSubscription<ChatEvent>? _streamSubscription;
   
@@ -240,6 +241,7 @@ class _ChatPageState extends State<ChatPage> {
       _currentResponse = '';
       _currentIntent = null;
       _currentActionResult = null;
+      _currentThinkingMessage = null;
     });
 
     _scrollToBottom();
@@ -271,24 +273,30 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _handleChatEvent(ChatEvent event) {
+    debugPrint('ChatEvent received: type=${event.type}, message=${event.message}');
     setState(() {
       switch (event.type) {
         case ChatEventType.status:
-          // Could show status in UI if needed
+          // Show status message to user
+          debugPrint('Status: ${event.message}');
+          _currentThinkingMessage = event.message;
           break;
         case ChatEventType.thinking:
-          // AI is thinking - could show thinking status
-          // For now, treat similar to status
+          // Show thinking message with emoji
+          debugPrint('Thinking: ${event.message}');
+          _currentThinkingMessage = '💭 ${event.message ?? 'Thinking...'}';
           break;
         case ChatEventType.intent:
           _currentIntent = event.intent;
           break;
         case ChatEventType.token:
+          _currentThinkingMessage = null;  // Clear thinking when receiving tokens
           _currentResponse += event.token ?? '';
           _scrollToBottom();
           break;
         case ChatEventType.content:
           // One-time complete content (non-streaming)
+          _currentThinkingMessage = null;  // Clear thinking when receiving content
           _currentResponse = event.content ?? event.message ?? '';
           _scrollToBottom();
           break;
@@ -349,11 +357,13 @@ class _ChatPageState extends State<ChatPage> {
         _currentResponse = '';
         _currentIntent = null;
         _currentActionResult = null;
+        _currentThinkingMessage = null;
         _isTyping = false;
       });
       _scrollToBottom();
     } else {
       setState(() {
+        _currentThinkingMessage = null;
         _isTyping = false;
       });
     }
@@ -572,6 +582,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildTypingArea() {
+    debugPrint('Building typing area: thinking=$_currentThinkingMessage, response=${_currentResponse.length} chars');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       alignment: Alignment.centerLeft,
@@ -598,25 +609,48 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ],
               ),
-              child: _currentResponse.isEmpty
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _TypingDot(delay: 0),
-                        const SizedBox(width: 4),
-                        _TypingDot(delay: 150),
-                        const SizedBox(width: 4),
-                        _TypingDot(delay: 300),
-                      ],
-                    )
-                  : SelectableText(
+              child: _currentResponse.isNotEmpty
+                  ? SelectableText(
                       _currentResponse,
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 15,
                         height: 1.5,
                       ),
-                    ),
+                    )
+                  : _currentThinkingMessage != null
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _currentThinkingMessage!,
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _TypingDot(delay: 0),
+                            const SizedBox(width: 4),
+                            _TypingDot(delay: 150),
+                            const SizedBox(width: 4),
+                            _TypingDot(delay: 300),
+                          ],
+                        ),
             ),
           ),
         ],
