@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../utils/date_formatter.dart';
@@ -27,6 +28,8 @@ class EventCard extends StatelessWidget {
     final countdown = DateFormatter.getCountdown(event.startTime);
     final isUpcoming = !event.startTime.isBefore(DateTime.now());
 
+    final hasThumbnail = event.sourceThumbnail != null && event.sourceThumbnail!.isNotEmpty;
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -38,34 +41,66 @@ class EventCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 标题和关注按钮
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      event.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+              // Thumbnail
+              if (hasThumbnail) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.memory(
+                    base64Decode(event.sourceThumbnail!),
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      );
+                    },
                   ),
-                  if (showActions && onToggleFollow != null)
-                    IconButton(
-                      icon: Icon(
-                        event.isFollowed ? Icons.star : Icons.star_border,
-                        color: event.isFollowed ? Colors.amber : Colors.grey,
-                      ),
-                      onPressed: onToggleFollow,
-                      tooltip: event.isFollowed ? '取消关注' : '关注',
-                      visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 12),
+              ],
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 标题和关注按钮
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            event.title,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (showActions && onToggleFollow != null)
+                          IconButton(
+                            icon: Icon(
+                              event.isFollowed ? Icons.star : Icons.star_border,
+                              color: event.isFollowed ? Colors.amber : Colors.grey,
+                            ),
+                            onPressed: onToggleFollow,
+                            tooltip: event.isFollowed ? '取消关注' : '关注',
+                            visualDensity: VisualDensity.compact,
+                          ),
+                      ],
                     ),
-                ],
-              ),
-              const SizedBox(height: 8),
+                    const SizedBox(height: 8),
               
               // 日期时间
               Row(
@@ -209,11 +244,14 @@ class EventCard extends StatelessWidget {
                         tooltip: '删除',
                         visualDensity: VisualDensity.compact,
                       ),
+                    ],
                   ],
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
+        ],
+      ),
         ),
       ),
     );
