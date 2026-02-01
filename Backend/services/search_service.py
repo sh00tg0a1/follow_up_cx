@@ -78,18 +78,18 @@ async def search_event_info(
     logger.info(f"[SEARCH] Full search query: {full_query}")
     
     try:
-        # Try SerpAPI first (if configured)
-        if has_serpapi:
-            logger.info("[SEARCH] Attempting search with SerpAPI...")
-            results = await _search_with_serpapi(full_query)
-            logger.info(f"[SEARCH] SerpAPI search completed - returned {len(results)} results")
-            return results
-        
-        # Try Tavily as alternative
+        # Try Tavily first (preferred - AI-optimized search)
         if has_tavily:
-            logger.info("[SEARCH] Attempting search with Tavily...")
+            logger.info("[SEARCH] Attempting search with Tavily (preferred)...")
             results = await _search_with_tavily(full_query)
             logger.info(f"[SEARCH] Tavily search completed - returned {len(results)} results")
+            return results
+        
+        # Fallback to SerpAPI
+        if has_serpapi:
+            logger.info("[SEARCH] Attempting search with SerpAPI (fallback)...")
+            results = await _search_with_serpapi(full_query)
+            logger.info(f"[SEARCH] SerpAPI search completed - returned {len(results)} results")
             return results
 
         logger.warning("[SEARCH] No search API key available (both keys are empty)")
@@ -396,3 +396,192 @@ def is_event_complete(result: Dict) -> bool:
         return False
 
     return True
+
+
+# ============================================================================
+# Synchronous versions for use in non-async contexts
+# ============================================================================
+
+def search_event_info_sync(
+    query: str,
+    location_hint: Optional[str] = None,
+    date_hint: Optional[str] = None,
+) -> List[SearchResult]:
+    """
+    Synchronous version of search_event_info
+    """
+    logger.info(f"[SEARCH-SYNC] Starting web search")
+    logger.info(f"[SEARCH-SYNC] Query: {query}")
+    
+    if not settings.ENABLE_WEB_SEARCH:
+        logger.info("[SEARCH-SYNC] Web search is disabled")
+        return []
+
+    has_serpapi = bool(settings.SERPAPI_KEY)
+    has_tavily = bool(settings.TAVILY_API_KEY)
+    
+    if not has_serpapi and not has_tavily:
+        logger.warning("[SEARCH-SYNC] No search API keys configured")
+        return []
+
+    full_query = query
+    if location_hint:
+        full_query += f" {location_hint}"
+    if date_hint:
+        full_query += f" {date_hint}"
+
+    logger.info(f"[SEARCH-SYNC] Full query: {full_query}")
+    
+    try:
+        # Try Tavily first (preferred - AI-optimized search)
+        if has_tavily:
+            logger.info("[SEARCH-SYNC] Using Tavily (preferred)...")
+            return _search_with_tavily_sync(full_query)
+        
+        # Fallback to SerpAPI
+        if has_serpapi:
+            logger.info("[SEARCH-SYNC] Using SerpAPI (fallback)...")
+            return _search_with_serpapi_sync(full_query)
+
+        return []
+
+    except Exception as e:
+        logger.error(f"[SEARCH-SYNC] Search failed: {e}", exc_info=True)
+        return []
+
+
+def _search_with_serpapi_sync(query: str) -> List[SearchResult]:
+    """Synchronous SerpAPI search"""
+    try:
+        from serpapi import GoogleSearch
+        
+        params = {
+            "q": query,
+            "api_key": settings.SERPAPI_KEY,
+            "num": 5,
+            "hl": "en",
+        }
+        
+        search = GoogleSearch(params)
+        results = search.get_dict()
+        
+        search_results = []
+        for r in results.get("organic_results", []):
+            search_results.append(SearchResult(
+                title=r.get("title", ""),
+                link=r.get("link", ""),
+                snippet=r.get("snippet", ""),
+            ))
+        
+        logger.info(f"[SEARCH-SYNC] SerpAPI returned {len(search_results)} results")
+        return search_results
+        
+    except ImportError:
+        logger.error("[SEARCH-SYNC] serpapi not installed")
+        return []
+    except Exception as e:
+        logger.error(f"[SEARCH-SYNC] SerpAPI failed: {e}")
+        return []
+
+
+def _search_with_tavily_sync(query: str) -> List[SearchResult]:
+    """Synchronous Tavily search"""
+    logger.info(f"[SEARCH-SYNC-Tavily] Searching: {query}")
+    try:
+        from tavily import TavilyClient
+
+        client = TavilyClient(api_key=settings.TAVILY_API_KEY)
+        
+        response = client.search(
+            query=query,
+            search_depth="advanced",
+            max_results=5,
+        )
+        
+        search_results = []
+        for r in response.get("results", []):
+            search_results.append(SearchResult(
+                title=r.get("title", ""),
+                link=r.get("url", ""),
+                snippet=r.get("content", ""),
+            ))
+        
+        logger.info(f"[SEARCH-SYNC] Tavily returned {len(search_results)} results")
+        return search_results
+        
+    except ImportError:
+        logger.error("[SEARCH-SYNC] tavily not installed")
+        return []
+    except Exception as e:
+        logger.error(f"[SEARCH-SYNC] Tavily failed: {e}")
+        return []
+
+
+def extract_event_details_from_search_sync(
+    search_results: List[SearchResult],
+    partial_event: Dict,
+) -> Optional[EventSearchResult]:
+    """
+    Synchronous version of extract_event_details_from_search
+    """
+    if not search_results:
+        return None
+
+    try:
+        from services.llm_service import get_llm
+
+        llm = get_llm()
+
+        context = "\n\n".join([
+            f"Source: {r.link}\nTitle: {r.title}\nSnippet: {r.snippet}"
+            for r in search_results[:5]
+        ])
+
+        prompt = f"""I have partial event information that needs to be completed:
+- Title: {partial_event.get('title', 'Unknown')}
+- Date hint: {partial_event.get('date_hint', 'Unknown')}
+- Location hint: {partial_event.get('location_hint', 'Unknown')}
+
+Web search results:
+{context}
+
+Extract event details in JSON:
+{{
+    "event_name": "Full event name",
+    "start_time": "ISO 8601 (e.g., 2026-02-15T09:00:00)",
+    "end_time": "ISO 8601 or null",
+    "location": "Venue name",
+    "venue_address": "Full address",
+    "description": "Brief description",
+    "ticket_url": "URL or null",
+    "price_range": "Price or null",
+    "source_url": "Source URL"
+}}
+
+Use T00:00:00 for all-day events if only date is available."""
+
+        response = llm.invoke(prompt)
+
+        content = response.content
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0]
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0]
+
+        result_data = json.loads(content.strip())
+
+        return EventSearchResult(
+            event_name=result_data.get("event_name", partial_event.get("title", "Unknown")),
+            start_time=result_data.get("start_time"),
+            end_time=result_data.get("end_time"),
+            location=result_data.get("location"),
+            venue_address=result_data.get("venue_address"),
+            description=result_data.get("description"),
+            ticket_url=result_data.get("ticket_url"),
+            price_range=result_data.get("price_range"),
+            source_url=result_data.get("source_url", search_results[0].link if search_results else ""),
+        )
+
+    except Exception as e:
+        logger.error(f"[SEARCH-SYNC] Failed to extract event details: {e}")
+        return None

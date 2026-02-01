@@ -559,6 +559,132 @@ def handle_create_event(state: AgentState) -> AgentState:
                     },
                 }
             
+            # If we have partial events (title but no time), try web search to complete
+            if parse_result.partial_events and settings.ENABLE_WEB_SEARCH:
+                logger.info(f"Found {len(parse_result.partial_events)} partial event(s), attempting web search")
+                progress_messages = ["Found event in image, searching for time information..."]
+                
+                partial_event = parse_result.partial_events[0]
+                event_title = partial_event.get("title", "")
+                
+                try:
+                    from services.search_service import (
+                        search_event_info_sync,
+                        extract_event_details_from_search_sync,
+                    )
+                    
+                    # Build search query
+                    search_query = event_title
+                    if parse_result.search_keywords:
+                        search_query = " ".join(parse_result.search_keywords)
+                    
+                    progress_messages.append(f"Searching for: {search_query}")
+                    search_results = search_event_info_sync(
+                        query=search_query,
+                        location_hint=partial_event.get("location"),
+                    )
+                    
+                    if search_results:
+                        progress_messages.append(f"Found {len(search_results)} results, extracting details...")
+                        completed_info = extract_event_details_from_search_sync(
+                            search_results,
+                            partial_event={"title": event_title, "location_hint": partial_event.get("location")},
+                        )
+                        
+                        if completed_info and completed_info.start_time:
+                            progress_messages.append("Event information found! Creating event...")
+                            
+                            # Create event with completed info
+                            try:
+                                start_time = datetime.fromisoformat(completed_info.start_time)
+                                end_time = datetime.fromisoformat(completed_info.end_time) if completed_info.end_time else None
+                                location = completed_info.location or completed_info.venue_address or partial_event.get("location")
+                                description = completed_info.description or partial_event.get("description", "")
+                                if completed_info.source_url:
+                                    description += f"\n\n🔗 Source: {completed_info.source_url}"
+                                
+                                # Check for duplicates
+                                duplicate = check_duplicate_event(db, state["user_id"], completed_info.event_name or event_title, start_time)
+                                if duplicate:
+                                    return {
+                                        **state,
+                                        "response": f"⚠️ This event already exists: **{duplicate.title}** ({duplicate.start_time.strftime('%Y-%m-%d %H:%M')})",
+                                        "progress_messages": progress_messages,
+                                        "action_result": {"action": "create_event", "duplicate": True, "existing_event_id": duplicate.id},
+                                    }
+                                
+                                event = Event(
+                                    user_id=state["user_id"],
+                                    title=completed_info.event_name or event_title,
+                                    start_time=start_time,
+                                    end_time=end_time,
+                                    location=location,
+                                    description=description,
+                                    source_type="image",
+                                    source_thumbnail=generate_thumbnail(images_base64[0]),
+                                    is_followed=True,
+                                )
+                                db.add(event)
+                                db.commit()
+                                db.refresh(event)
+                                
+                                logger.info(f"Created event from image+search: {event.title} (id={event.id})")
+                                
+                                from services.ics_service import generate_ics_content
+                                response_text = f"✅ Event created (info from web search):\n\n"
+                                response_text += f"📅 **{event.title}**\n"
+                                response_text += f"⏰ Time: {event.start_time.strftime('%Y-%m-%d %H:%M')}"
+                                if event.end_time:
+                                    response_text += f" - {event.end_time.strftime('%H:%M')}"
+                                response_text += "\n"
+                                if event.location:
+                                    response_text += f"📍 Location: {event.location}\n"
+                                
+                                return {
+                                    **state,
+                                    "response": response_text,
+                                    "progress_messages": progress_messages,
+                                    "action_result": {
+                                        "action": "create_event",
+                                        "event_id": event.id,
+                                        "events": [{
+                                            "id": event.id,
+                                            "title": event.title,
+                                            "start_time": event.start_time.isoformat(),
+                                            "end_time": event.end_time.isoformat() if event.end_time else None,
+                                            "location": event.location,
+                                            "ics_content": generate_ics_content(event),
+                                            "ics_download_url": f"/api/events/{event.id}/ics",
+                                        }],
+                                    },
+                                }
+                            except Exception as create_error:
+                                logger.error(f"Failed to create event from search: {create_error}")
+                                progress_messages.append(f"Failed to create event: {str(create_error)}")
+                        else:
+                            progress_messages.append("Could not find complete event details")
+                    else:
+                        progress_messages.append("No search results found")
+                    
+                    # Search failed or incomplete - return with partial info
+                    return {
+                        **state,
+                        "response": f"I found **{event_title}** in the image but couldn't find the date/time. Please provide the event time.",
+                        "progress_messages": progress_messages,
+                        "action_result": {
+                            "action": "create_event",
+                            "need_more_info": True,
+                            "partial_data": {"title": event_title, "location": partial_event.get("location")},
+                        },
+                    }
+                except Exception as e:
+                    logger.warning(f"Search failed for partial event: {e}")
+                    return {
+                        **state,
+                        "response": f"I found **{event_title}** in the image. When is this event happening?",
+                        "action_result": {"action": "create_event", "need_more_info": True, "partial_data": {"title": event_title}},
+                    }
+            
             # Return clarification question if needed
             if parse_result.needs_clarification and parse_result.clarification_question:
                 logger.info("Image parsing requires clarification")

@@ -35,6 +35,9 @@ class ParseResult(NamedTuple):
     events: List[ParsedEvent]
     needs_clarification: bool = False
     clarification_question: Optional[str] = None
+    # Additional fields for incomplete events that may need search
+    search_keywords: Optional[List[str]] = None
+    partial_events: Optional[List[dict]] = None  # Events with title but no time
 
 
 # ============================================================================
@@ -238,90 +241,110 @@ def parse_image_with_llm(
         # Parse JSON response
         result = parser.parse(response.content)
 
-        # Check if clarification is needed
+        # Check if we have events and if they need time completion
         needs_clarification = result.get("needs_clarification", False)
         clarification_question = result.get("clarification_question")
+        search_keywords = result.get("search_keywords", [])
         
-        if needs_clarification:
-            logger.info(f"LLM requests clarification: {clarification_question}")
+        # Check if any event is missing start_time
+        events_raw = result.get("events", [])
+        has_event_without_time = any(
+            e.get("title") and not e.get("start_time") 
+            for e in events_raw
+        )
         
-        # NEW: If incomplete and web search enabled, try to complete
-        if needs_clarification and settings.ENABLE_WEB_SEARCH:
-            search_keywords = result.get("search_keywords", [])
-            if search_keywords:
-                logger.info(f"[LLM-IMAGE] Event information incomplete, attempting web search with keywords: {search_keywords}")
+        # Auto-generate search keywords from event titles if not provided
+        if not search_keywords and has_event_without_time:
+            for e in events_raw:
+                if e.get("title"):
+                    search_keywords.append(e["title"])
+            if result.get("date_hint"):
+                search_keywords.append(result["date_hint"])
+            logger.info(f"[LLM-IMAGE] Auto-generated search keywords from event title: {search_keywords}")
+        
+        # Trigger web search if: we have search_keywords AND (missing time OR needs clarification)
+        should_search = settings.ENABLE_WEB_SEARCH and search_keywords and (has_event_without_time or needs_clarification)
+        
+        if should_search:
+            logger.info(f"[LLM-IMAGE] Event info incomplete (missing_time={has_event_without_time}), attempting web search with keywords: {search_keywords}")
+            
+            try:
+                from services.search_service import (
+                    search_event_info_sync,
+                    extract_event_details_from_search_sync,
+                    merge_event_info,
+                )
                 
-                try:
-                    from services.search_service import (
-                        search_event_info,
-                        extract_event_details_from_search,
-                        merge_event_info,
-                        is_event_complete,
+                # Extract location hint from first event if available
+                location_hint = None
+                if events_raw:
+                    location_hint = events_raw[0].get("location")
+                
+                logger.info(f"[LLM-IMAGE] Calling search_event_info_sync...")
+                search_results = search_event_info_sync(
+                    query=" ".join(search_keywords),
+                    location_hint=location_hint,
+                    date_hint=result.get("date_hint"),
+                )
+                
+                logger.info(f"[LLM-IMAGE] Search returned {len(search_results) if search_results else 0} results")
+                
+                if search_results:
+                    logger.info(f"[LLM-IMAGE] Extracting event details from search results...")
+                    first_event = events_raw[0] if events_raw else {}
+                    completed_info = extract_event_details_from_search_sync(
+                        search_results,
+                        partial_event={
+                            "title": first_event.get("title", ""),
+                            "date_hint": result.get("date_hint"),
+                            "location_hint": first_event.get("location", ""),
+                        },
                     )
                     
-                    # Extract location hint from first event if available
-                    location_hint = None
-                    if result.get("events") and len(result["events"]) > 0:
-                        location_hint = result["events"][0].get("location")
-                    
-                    logger.info(f"[LLM-IMAGE] Calling search_service.search_event_info...")
-                    # Search web (run async in sync context)
-                    search_results = asyncio.run(search_event_info(
-                        query=" ".join(search_keywords),
-                        location_hint=location_hint or result.get("location_hint"),
-                        date_hint=result.get("date_hint"),
-                    ))
-                    
-                    logger.info(f"[LLM-IMAGE] Search returned {len(search_results)} results")
-                    
-                    if search_results:
-                        logger.info(f"[LLM-IMAGE] Extracting event details from search results...")
-                        # Extract details from search results
-                        first_event = result.get("events", [{}])[0] if result.get("events") else {}
-                        completed_info = asyncio.run(extract_event_details_from_search(
-                            search_results,
-                            partial_event={
-                                "title": first_event.get("title", ""),
-                                "date_hint": result.get("date_hint"),
-                                "location_hint": first_event.get("location", ""),
-                            },
-                        ))
+                    if completed_info:
+                        logger.info(f"[LLM-IMAGE] Search found: {completed_info.event_name}, time={completed_info.start_time}")
+                        # Merge with original result
+                        result = merge_event_info(result, completed_info)
                         
-                        if completed_info:
-                            logger.info(f"[LLM-IMAGE] Merging search results with original event data...")
-                            # Merge with original result
-                            result = merge_event_info(result, completed_info)
-                            
-                            # Re-check if still needs clarification
-                            if is_event_complete(result):
-                                needs_clarification = False
-                                clarification_question = None
-                                logger.info("[LLM-IMAGE] Web search successfully completed event info - no clarification needed")
-                            else:
-                                logger.info("[LLM-IMAGE] Web search provided partial information - still needs clarification")
+                        # Check if we now have complete info
+                        updated_events = result.get("events", [])
+                        if updated_events and updated_events[0].get("start_time"):
+                            needs_clarification = False
+                            clarification_question = None
+                            logger.info("[LLM-IMAGE] Web search successfully completed event info")
                         else:
-                            logger.info("[LLM-IMAGE] Could not extract event details from search results")
+                            logger.info("[LLM-IMAGE] Web search provided partial information")
                     else:
-                        logger.info("[LLM-IMAGE] No search results returned - will ask user for clarification")
-                except Exception as e:
-                    logger.warning(f"[LLM-IMAGE] Web search failed, falling back to clarification: {e}")
-        elif needs_clarification and not settings.ENABLE_WEB_SEARCH:
-            logger.info("[LLM-IMAGE] Event information incomplete, but web search is disabled - will ask user for clarification")
+                        logger.info("[LLM-IMAGE] Could not extract event details from search results")
+                else:
+                    logger.info("[LLM-IMAGE] No search results returned")
+            except Exception as e:
+                logger.warning(f"[LLM-IMAGE] Web search failed: {e}", exc_info=True)
+        elif has_event_without_time and not settings.ENABLE_WEB_SEARCH:
+            logger.info("[LLM-IMAGE] Event info incomplete, but web search is disabled")
         
-        # Convert to ParsedEvent
+        # Convert to ParsedEvent (only events with valid start_time)
         events = _convert_to_parsed_events(result, source_type="image")
+        
+        # Collect partial events (have title but no start_time) for potential search in graph.py
+        partial_events = [
+            e for e in result.get("events", [])
+            if e.get("title") and not e.get("start_time")
+        ]
 
-        logger.info(f"LLM image parsing completed: {len(events)} event(s) extracted, needs_clarification={needs_clarification}")
+        logger.info(f"LLM image parsing completed: {len(events)} complete event(s), {len(partial_events)} partial event(s)")
         return ParseResult(
             events=events,
             needs_clarification=needs_clarification,
             clarification_question=clarification_question,
+            search_keywords=search_keywords if search_keywords else None,
+            partial_events=partial_events if partial_events else None,
         )
     
     except Exception as e:
         elapsed = time.time() - start_time
         logger.error(f"LLM image parsing failed after {elapsed:.2f}s: {e}", exc_info=True)
-        return ParseResult(events=[], needs_clarification=False, clarification_question=None)
+        return ParseResult(events=[], needs_clarification=False, clarification_question=None, search_keywords=None, partial_events=None)
 
 
 def parse_images_with_llm(
@@ -434,18 +457,24 @@ def _convert_to_parsed_events(
     events = []
     for idx, event_data in enumerate(result.get("events", [])):
         try:
+            # Skip events without start_time (will be handled by partial_events)
+            start_time_str = event_data.get("start_time")
+            if not start_time_str:
+                logger.debug(f"Event {idx+1} '{event_data.get('title')}' has no start_time, skipping")
+                continue
+            
             events.append(ParsedEvent(
                 id=None,
                 title=event_data["title"],
-                start_time=datetime.fromisoformat(event_data["start_time"]),
+                start_time=datetime.fromisoformat(start_time_str),
                 end_time=datetime.fromisoformat(event_data["end_time"]) if event_data.get("end_time") else None,
                 location=event_data.get("location"),
                 description=event_data.get("description"),
                 source_type=source_type,
                 is_followed=False,
             ))
-            logger.debug(f"Parsed event {idx+1}: {event_data.get('title')} @ {event_data.get('start_time')}")
-        except (KeyError, ValueError) as e:
+            logger.debug(f"Parsed event {idx+1}: {event_data.get('title')} @ {start_time_str}")
+        except (KeyError, ValueError, TypeError) as e:
             # Skip events with invalid format
             logger.warning(f"Skipping invalid event data at index {idx}: {e}")
             continue
