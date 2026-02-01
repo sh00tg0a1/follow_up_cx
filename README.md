@@ -88,6 +88,66 @@ flowchart TB
 
 ---
 
+## How to Run
+
+### Prerequisites
+
+- Python 3.11+
+- OpenAI API Key
+- Flutter 3.x (optional; only needed to rebuild the embedded Web UI or run the app natively)
+
+### Backend
+
+```bash
+# Navigate to backend directory
+cd Backend
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment variables
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
+
+# Run the development server
+python main.py
+```
+
+Open the Web UI at `http://localhost:8000`.
+
+The API will be available at `http://localhost:8000/api/*`. View API docs at `http://localhost:8000/docs`.
+
+### Frontend
+
+The backend can serve the Flutter Web build directly (recommended for demo):
+
+```bash
+# Build Flutter Web (outputs to Frontend/followup/build/web)
+cd Frontend/followup
+flutter build web
+
+# Then run the backend and open:
+# http://localhost:8000
+```
+
+If you want to run Flutter directly (native app development or hot reload):
+
+```bash
+# Navigate to frontend directory
+cd Frontend/followup
+
+# Install dependencies
+flutter pub get
+
+# Run the app
+flutter run
+
+# Build for web
+flutter build web
+```
+
+---
+
 ## Details
 
 Add anything else you want to share: architecture diagrams, screenshots, challenges faced, future plans, etc.
@@ -151,66 +211,6 @@ flowchart TB
 - **Real follow up**: a background bot that tracks event progress (ticket sales, time changes, new info) and notifies users.
 - **Light social**: share events (invites, links, ICS) with friends.
 - **Small groups**: family or group activities with shared/limited collaboration.
-
----
-
-## How to Run
-
-### Prerequisites
-
-- Python 3.11+
-- OpenAI API Key
-- Flutter 3.x (optional; only needed to rebuild the embedded Web UI or run the app natively)
-
-### Backend
-
-```bash
-# Navigate to backend directory
-cd Backend
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment variables
-cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
-
-# Run the development server
-python main.py
-```
-
-Open the Web UI at `http://localhost:8000`.
-
-The API will be available at `http://localhost:8000/api/*`. View API docs at `http://localhost:8000/docs`.
-
-### Frontend
-
-The backend can serve the Flutter Web build directly (recommended for demo):
-
-```bash
-# Build Flutter Web (outputs to Frontend/followup/build/web)
-cd Frontend/followup
-flutter build web
-
-# Then run the backend and open:
-# http://localhost:8000
-```
-
-If you want to run Flutter directly (native app development or hot reload):
-
-```bash
-# Navigate to frontend directory
-cd Frontend/followup
-
-# Install dependencies
-flutter pub get
-
-# Run the app
-flutter run
-
-# Build for web
-flutter build web
-```
 
 ---
 
