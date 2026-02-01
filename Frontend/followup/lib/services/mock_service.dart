@@ -113,6 +113,25 @@ class MockService {
         .toList();
   }
 
+  // 模拟查找重复活动
+  static Future<DuplicatesResponse> getDuplicates() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    // Mock 返回空结果
+    return DuplicatesResponse(
+      totalDuplicates: 0,
+      groups: [],
+    );
+  }
+
+  // 模拟批量删除重复活动
+  static Future<DeleteDuplicatesResponse> deleteDuplicates(List<int> eventIds) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return DeleteDuplicatesResponse(
+      deletedCount: eventIds.length,
+      deletedIds: eventIds,
+    );
+  }
+
   // Mock 活动数据
   static List<EventData> _getMockEvents({bool followedOnly = false}) {
     final allEvents = [

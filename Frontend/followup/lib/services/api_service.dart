@@ -162,6 +162,49 @@ class ApiService {
     }
   }
 
+  // 查找重复活动
+  static Future<DuplicatesResponse> getDuplicates({
+    double similarityThreshold = 0.8,
+    int timeWindowHours = 24,
+  }) async {
+    if (useMock) {
+      return MockService.getDuplicates();
+    }
+
+    final uri = Uri.parse("${ApiConfig.baseUrl}/api/events/duplicates")
+        .replace(queryParameters: {
+          "similarity_threshold": similarityThreshold.toString(),
+          "time_window_hours": timeWindowHours.toString(),
+        });
+
+    final response = await http.get(uri, headers: await _authHeaders());
+
+    if (response.statusCode == 200) {
+      return DuplicatesResponse.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception("查找重复活动失败");
+    }
+  }
+
+  // 批量删除重复活动
+  static Future<DeleteDuplicatesResponse> deleteDuplicates(List<int> eventIds) async {
+    if (useMock) {
+      return MockService.deleteDuplicates(eventIds);
+    }
+
+    final response = await http.delete(
+      Uri.parse("${ApiConfig.baseUrl}/api/events/duplicates"),
+      headers: await _authHeaders(),
+      body: jsonEncode({"event_ids": eventIds}),
+    );
+
+    if (response.statusCode == 200) {
+      return DeleteDuplicatesResponse.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception("删除重复活动失败");
+    }
+  }
+
   // 创建活动
   static Future<EventData> createEvent(EventData event) async {
     if (useMock) {

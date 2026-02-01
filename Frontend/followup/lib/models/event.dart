@@ -138,3 +138,67 @@ class ParseResponse {
     );
   }
 }
+
+// 重复活动分组
+class DuplicateGroup {
+  final String key; // 重复标识
+  final List<EventData> events; // 该组中的所有重复活动
+  final int keepId; // 建议保留的活动 ID
+  final List<int> deleteIds; // 建议删除的活动 ID
+
+  DuplicateGroup({
+    required this.key,
+    required this.events,
+    required this.keepId,
+    required this.deleteIds,
+  });
+
+  factory DuplicateGroup.fromJson(Map<String, dynamic> json) {
+    return DuplicateGroup(
+      key: json['key'] as String,
+      events: (json['events'] as List)
+          .map((e) => EventData.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      keepId: json['keep_id'] as int,
+      deleteIds: (json['delete_ids'] as List).cast<int>(),
+    );
+  }
+}
+
+// 重复活动查询响应
+class DuplicatesResponse {
+  final int totalDuplicates; // 重复活动总数
+  final List<DuplicateGroup> groups; // 重复活动分组
+
+  DuplicatesResponse({
+    required this.totalDuplicates,
+    required this.groups,
+  });
+
+  factory DuplicatesResponse.fromJson(Map<String, dynamic> json) {
+    return DuplicatesResponse(
+      totalDuplicates: json['total_duplicates'] as int,
+      groups: (json['groups'] as List)
+          .map((g) => DuplicateGroup.fromJson(g as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+// 删除重复活动响应
+class DeleteDuplicatesResponse {
+  final int deletedCount;
+  final List<int> deletedIds;
+
+  DeleteDuplicatesResponse({
+    required this.deletedCount,
+    required this.deletedIds,
+  });
+
+  factory DeleteDuplicatesResponse.fromJson(Map<String, dynamic> json) {
+    return DeleteDuplicatesResponse(
+      deletedCount: json['deleted_count'] as int,
+      deletedIds: (json['deleted_ids'] as List).cast<int>(),
+    );
+  }
+}
