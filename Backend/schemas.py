@@ -72,6 +72,8 @@ class EventCreate(BaseModel):
     source_type: Optional[str] = Field("manual", max_length=50)
     source_thumbnail: Optional[str] = Field(None, description="Thumbnail of image source (base64)")
     is_followed: bool = True
+    recurrence_rule: Optional[str] = Field(None, max_length=255, description="RRULE format, e.g., 'FREQ=DAILY;INTERVAL=1' or 'FREQ=WEEKLY;BYDAY=MO,WE,FR'")
+    recurrence_end: Optional[datetime] = Field(None, description="End date/time for recurrence")
 
 
 class EventUpdate(BaseModel):
@@ -82,6 +84,8 @@ class EventUpdate(BaseModel):
     location: Optional[str] = Field(None, max_length=500)
     description: Optional[str] = None
     is_followed: Optional[bool] = None
+    recurrence_rule: Optional[str] = Field(None, max_length=255, description="RRULE format")
+    recurrence_end: Optional[datetime] = Field(None, description="End date/time for recurrence")
 
 
 class EventResponse(BaseModel):
@@ -96,6 +100,9 @@ class EventResponse(BaseModel):
     source_thumbnail: Optional[str] = None  # 图片来源的缩略图（base64）
     is_followed: bool = False
     created_at: datetime
+    recurrence_rule: Optional[str] = None  # RRULE format
+    recurrence_end: Optional[datetime] = None  # End date/time for recurrence
+    parent_event_id: Optional[int] = None  # Parent event ID if this is a recurrence instance
     ics_content: Optional[str] = None  # ICS 文件内容（base64 编码），创建事件时返回
     ics_download_url: Optional[str] = None  # ICS 文件下载 URL
 

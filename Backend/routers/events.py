@@ -57,6 +57,9 @@ def event_to_response(event: Event, include_ics: bool = False) -> EventResponse:
         source_thumbnail=event.source_thumbnail,
         is_followed=event.is_followed,
         created_at=event.created_at,
+        recurrence_rule=event.recurrence_rule,
+        recurrence_end=event.recurrence_end,
+        parent_event_id=event.parent_event_id,
         ics_content=ics_content,
         ics_download_url=ics_download_url,
     )
@@ -126,11 +129,15 @@ async def search_events(
 async def find_duplicates(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    similarity_threshold: float = Query(0.8, ge=0.0, le=1.0, description="Title similarity threshold (0-1)"),
+    time_window_hours: int = Query(24, ge=1, le=168, description="Time window in hours for considering events as similar"),
 ):
     """
     Query user's duplicate events
     
-    Duplicate definition: Events with the same title and start time
+    Duplicate definition:
+    1. Exact duplicates: Events with the same title and start time
+    2. Similar events: Events with similar titles (>= threshold) within time window
     
     Returns grouped duplicate event list, each group contains:
     - key: Duplicate identifier
@@ -140,35 +147,83 @@ async def find_duplicates(
     
     Requires authentication: Authorization: Bearer <token>
     """
-    from sqlalchemy import func
     from collections import defaultdict
+    from services.recurrence_service import detect_similar_events
     
-    logger.info(f"Finding duplicate events for user {current_user.username}")
+    logger.info(f"Finding duplicate events for user {current_user.username} (similarity_threshold={similarity_threshold}, time_window={time_window_hours}h)")
     
     # Query all events
     all_events = db.query(Event).filter(
         Event.user_id == current_user.id
     ).order_by(Event.created_at).all()
     
-    # Group by (title, start_time)
-    groups_dict = defaultdict(list)
+    # Group 1: Exact duplicates (same title + same start_time)
+    exact_groups_dict = defaultdict(list)
     for event in all_events:
         key = (event.title, event.start_time)
-        groups_dict[key].append(event)
+        exact_groups_dict[key].append(event)
     
-    # Filter groups with duplicates
+    # Group 2: Similar events (similar title + nearby time)
+    # Use a set to track already grouped events
+    processed_events = set()
+    similar_groups = []
+    
+    for i, event1 in enumerate(all_events):
+        if event1.id in processed_events:
+            continue
+        
+        similar_group = [event1]
+        processed_events.add(event1.id)
+        
+        for event2 in all_events[i+1:]:
+            if event2.id in processed_events:
+                continue
+            
+            if detect_similar_events(
+                event1.title,
+                event2.title,
+                event1.start_time,
+                event2.start_time,
+                similarity_threshold,
+                time_window_hours,
+            ):
+                similar_group.append(event2)
+                processed_events.add(event2.id)
+        
+        if len(similar_group) > 1:
+            similar_groups.append(similar_group)
+    
+    # Combine exact duplicates and similar events
     duplicate_groups = []
     total_duplicates = 0
     
-    for (title, start_time), events in groups_dict.items():
+    # Process exact duplicates
+    for (title, start_time), events in exact_groups_dict.items():
         if len(events) > 1:
-            # Has duplicates
             key_str = f"{title} @ {start_time.strftime('%Y-%m-%d %H:%M')}"
             
-            # Sort by creation time, keep the earliest
             sorted_events = sorted(events, key=lambda e: e.created_at)
             keep_event = sorted_events[0]
             delete_events = sorted_events[1:]
+            
+            duplicate_groups.append(DuplicateGroup(
+                key=key_str,
+                events=[event_to_response(e) for e in sorted_events],
+                keep_id=keep_event.id,
+                delete_ids=[e.id for e in delete_events],
+            ))
+            
+            total_duplicates += len(delete_events)
+    
+    # Process similar events
+    for similar_group in similar_groups:
+        if len(similar_group) > 1:
+            sorted_events = sorted(similar_group, key=lambda e: e.created_at)
+            keep_event = sorted_events[0]
+            delete_events = sorted_events[1:]
+            
+            # Create key from first event
+            key_str = f"Similar: {keep_event.title} @ {keep_event.start_time.strftime('%Y-%m-%d %H:%M')}"
             
             duplicate_groups.append(DuplicateGroup(
                 key=key_str,
@@ -336,6 +391,10 @@ async def update_event_endpoint(
         event.description = request.description
     if request.is_followed is not None:
         event.is_followed = request.is_followed
+    if request.recurrence_rule is not None:
+        event.recurrence_rule = request.recurrence_rule
+    if request.recurrence_end is not None:
+        event.recurrence_end = request.recurrence_end
 
     db.commit()
     db.refresh(event)

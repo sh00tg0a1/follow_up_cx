@@ -48,6 +48,11 @@ class Event(Base):
     source_content = Column(Text, nullable=True)  # 原始输入内容
     source_thumbnail = Column(Text, nullable=True)  # 图片来源的缩略图（base64 编码，约 200x200）
     
+    # 重复事件相关
+    recurrence_rule = Column(String(255), nullable=True)  # RRULE格式，如 "FREQ=DAILY;INTERVAL=1" 或 "FREQ=WEEKLY;BYDAY=MO,WE,FR"
+    recurrence_end = Column(DateTime, nullable=True)  # 重复结束时间
+    parent_event_id = Column(Integer, ForeignKey("events.id"), nullable=True, index=True)  # 父事件ID（如果是重复事件的实例）
+    
     # 状态
     is_followed = Column(Boolean, default=False, nullable=False, index=True)
     
@@ -56,6 +61,7 @@ class Event(Base):
 
     # 关系
     user = relationship("User", back_populates="events")
+    parent_event = relationship("Event", remote_side=[id], backref="recurrence_instances")  # 自引用关系
 
 
 class Conversation(Base):

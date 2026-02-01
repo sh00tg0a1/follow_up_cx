@@ -5,6 +5,7 @@
 支持的迁移：
 - source_thumbnail 列
 - conversations 表
+- recurrence_rule, recurrence_end, parent_event_id 列（重复事件支持）
 """
 from sqlalchemy import text
 from database import engine, SessionLocal
@@ -85,19 +86,47 @@ def migrate_events_table():
             events_table_exists = result.scalar() is not None
             
             if events_table_exists:
-                # 检查 source_thumbnail 列是否存在（通过尝试查询来判断）
+                # Check and add source_thumbnail column
                 try:
                     db.execute(text("SELECT source_thumbnail FROM events LIMIT 1"))
                     logger.debug("source_thumbnail column already exists")
                 except Exception:
-                    # 列不存在，需要添加
                     logger.info("Adding source_thumbnail column to events table...")
-                    db.execute(text("""
-                        ALTER TABLE events 
-                        ADD COLUMN source_thumbnail TEXT NULL
-                    """))
+                    db.execute(text("ALTER TABLE events ADD COLUMN source_thumbnail TEXT NULL"))
                     db.commit()
                     logger.info("Successfully added source_thumbnail column")
+                
+                # Check and add recurrence_rule column
+                try:
+                    db.execute(text("SELECT recurrence_rule FROM events LIMIT 1"))
+                    logger.debug("recurrence_rule column already exists")
+                except Exception:
+                    logger.info("Adding recurrence_rule column to events table...")
+                    db.execute(text("ALTER TABLE events ADD COLUMN recurrence_rule VARCHAR(255) NULL"))
+                    db.commit()
+                    logger.info("Successfully added recurrence_rule column")
+                
+                # Check and add recurrence_end column
+                try:
+                    db.execute(text("SELECT recurrence_end FROM events LIMIT 1"))
+                    logger.debug("recurrence_end column already exists")
+                except Exception:
+                    logger.info("Adding recurrence_end column to events table...")
+                    db.execute(text("ALTER TABLE events ADD COLUMN recurrence_end TIMESTAMP NULL"))
+                    db.commit()
+                    logger.info("Successfully added recurrence_end column")
+                
+                # Check and add parent_event_id column
+                try:
+                    db.execute(text("SELECT parent_event_id FROM events LIMIT 1"))
+                    logger.debug("parent_event_id column already exists")
+                except Exception:
+                    logger.info("Adding parent_event_id column to events table...")
+                    db.execute(text("ALTER TABLE events ADD COLUMN parent_event_id INTEGER NULL"))
+                    # SQLite doesn't support adding foreign key constraints via ALTER TABLE
+                    # The constraint will be enforced by SQLAlchemy
+                    db.commit()
+                    logger.info("Successfully added parent_event_id column")
             else:
                 logger.debug("events table does not exist yet, will be created by init_db()")
             

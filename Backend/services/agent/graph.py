@@ -487,6 +487,12 @@ def handle_create_event(state: AgentState) -> AgentState:
                 },
             }
         
+        # Parse recurrence information if present
+        recurrence_rule = event_data.get("recurrence_rule")
+        recurrence_end = None
+        if event_data.get("recurrence_end"):
+            recurrence_end = datetime.fromisoformat(event_data["recurrence_end"])
+        
         # Create event
         event = Event(
             user_id=state["user_id"],
@@ -497,6 +503,8 @@ def handle_create_event(state: AgentState) -> AgentState:
             description=event_data.get("description"),
             source_type="agent",
             is_followed=True,
+            recurrence_rule=recurrence_rule,
+            recurrence_end=recurrence_end,
         )
         db.add(event)
         db.commit()
@@ -504,6 +512,44 @@ def handle_create_event(state: AgentState) -> AgentState:
         
         logger.info(f"Created event: {event.title} (id={event.id})")
         
+        # Generate recurrence instances if recurrence_rule is provided
+        recurrence_count = 0
+        if recurrence_rule:
+            from services.recurrence_service import generate_recurrence_instances
+            
+            logger.info(f"Generating recurrence instances for event {event.id} with rule: {recurrence_rule}")
+            
+            instances = generate_recurrence_instances(
+                start_time=start_time,
+                recurrence_rule=recurrence_rule,
+                recurrence_end=recurrence_end,
+                max_instances=100,
+            )
+            
+            # Create recurrence instances (skip first one as it's the parent)
+            for instance_time in instances[1:]:
+                # Calculate end_time offset if original event has end_time
+                instance_end_time = None
+                if event.end_time:
+                    duration = event.end_time - start_time
+                    instance_end_time = instance_time + duration
+                
+                instance = Event(
+                    user_id=state["user_id"],
+                    title=title,
+                    start_time=instance_time,
+                    end_time=instance_end_time,
+                    location=event.location,
+                    description=event.description,
+                    source_type="agent",
+                    is_followed=True,
+                    parent_event_id=event.id,
+                )
+                db.add(instance)
+                recurrence_count += 1
+            
+            db.commit()
+            logger.info(f"Created {recurrence_count} recurrence instances for event {event.id}")
         
         # Generate ICS file content
         from services.ics_service import generate_ics_content
@@ -520,6 +566,8 @@ def handle_create_event(state: AgentState) -> AgentState:
             response_text += f"📍 Location: {event.location}\n"
         if event.description:
             response_text += f"📝 Notes: {event.description}\n"
+        if recurrence_rule and recurrence_count > 0:
+            response_text += f"🔄 Recurring: {recurrence_count} additional instance(s) created\n"
         
         return {
             **state,
@@ -530,6 +578,7 @@ def handle_create_event(state: AgentState) -> AgentState:
                 "event_title": event.title,
                 "ics_content": ics_content,
                 "ics_download_url": f"/api/events/{event.id}/ics",
+                "recurrence_count": recurrence_count,
             },
         }
         
