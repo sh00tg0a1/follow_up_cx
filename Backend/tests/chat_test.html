@@ -46,6 +46,26 @@
             
             <!-- 配置区域 -->
             <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-gray-200">
+                <!-- 服务器快速切换 -->
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">服务器</label>
+                    <div class="flex gap-2">
+                        <button 
+                            id="serverLocal"
+                            class="server-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 cursor-pointer bg-blue-600 text-white"
+                            data-url="http://localhost:8000"
+                        >
+                            🏠 本地 (localhost:8000)
+                        </button>
+                        <button 
+                            id="serverRailway"
+                            class="server-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 cursor-pointer bg-slate-200 text-slate-700 hover:bg-slate-300"
+                            data-url="https://web-production-d2e00.up.railway.app"
+                        >
+                            ☁️ Railway (生产环境)
+                        </button>
+                    </div>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">API 地址</label>
@@ -169,6 +189,13 @@
 
         // 绑定事件处理器
         function initEventListeners() {
+            // 绑定服务器切换按钮
+            document.querySelectorAll('.server-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    selectServer(this);
+                });
+            });
+            
             // 绑定文件选择事件
             document.getElementById('fileInput').addEventListener('change', handleFileSelect);
             
@@ -189,7 +216,45 @@
             // 绑定键盘事件 - 回车发送消息
             document.getElementById('messageInput').addEventListener('keydown', handleKeyDown);
             
+            // 绑定 API 地址输入框变化事件
+            document.getElementById('apiUrl').addEventListener('input', syncServerButtons);
+            
             console.log('Event listeners initialized');
+        }
+
+        // 同步服务器按钮状态
+        function syncServerButtons() {
+            const currentUrl = document.getElementById('apiUrl').value.trim();
+            let matched = false;
+            
+            document.querySelectorAll('.server-btn').forEach(btn => {
+                const btnUrl = btn.getAttribute('data-url');
+                if (currentUrl === btnUrl) {
+                    btn.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+                    btn.classList.add('bg-blue-600', 'text-white');
+                    matched = true;
+                } else {
+                    btn.classList.remove('bg-blue-600', 'text-white');
+                    btn.classList.add('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+                }
+            });
+        }
+
+        // 选择服务器
+        function selectServer(selectedBtn) {
+            // 更新按钮样式
+            document.querySelectorAll('.server-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+            });
+            selectedBtn.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+            selectedBtn.classList.add('bg-blue-600', 'text-white');
+            
+            // 更新 API 地址
+            const url = selectedBtn.getAttribute('data-url');
+            document.getElementById('apiUrl').value = url;
+            
+            console.log('Selected server:', url);
         }
 
         // 页面加载完成后绑定事件处理器
