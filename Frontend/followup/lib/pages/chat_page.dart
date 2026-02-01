@@ -27,6 +27,7 @@ class _ChatPageState extends State<ChatPage> {
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   final ImagePicker _imagePicker = ImagePicker();
+  final FocusNode _sendButtonFocusNode = FocusNode();
   bool _isTyping = false;
   String _currentResponse = '';
   String? _currentIntent;
@@ -69,6 +70,7 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _sendButtonFocusNode.dispose();
     _streamSubscription?.cancel();
     super.dispose();
   }
@@ -774,30 +776,60 @@ class _ChatPageState extends State<ChatPage> {
                           ),
                         ),
                         const Spacer(),
-                        // Send button (arrow up)
+                        // Send button (arrow up) - focusable with Tab key
                         Builder(
                           builder: (context) {
                             final bool canSend = !_isTyping && 
                                 (_messageController.text.trim().isNotEmpty || _selectedImages.isNotEmpty);
-                            return GestureDetector(
-                              onTap: canSend ? _sendMessage : null,
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  // Disabled state: green with gray overlay (shows it's a green button but disabled)
-                                  color: canSend 
-                                      ? AppColors.primary
-                                      : AppColors.primary.withValues(alpha: 0.4),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: canSend 
-                                      ? Colors.white 
-                                      : Colors.white.withValues(alpha: 0.7),
-                                  size: 20,
-                                ),
+                            return Focus(
+                              focusNode: _sendButtonFocusNode,
+                              child: Builder(
+                                builder: (context) {
+                                  final isFocused = Focus.of(context).hasFocus;
+                                  return GestureDetector(
+                                    onTap: canSend ? _sendMessage : null,
+                                    child: KeyboardListener(
+                                      focusNode: FocusNode(skipTraversal: true),
+                                      onKeyEvent: (event) {
+                                        // Handle Enter/Space when focused
+                                        if (canSend && 
+                                            event is KeyDownEvent &&
+                                            (event.logicalKey.keyLabel == 'Enter' || 
+                                             event.logicalKey.keyLabel == ' ')) {
+                                          _sendMessage();
+                                        }
+                                      },
+                                      child: Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: canSend 
+                                              ? AppColors.primary
+                                              : AppColors.primary.withValues(alpha: 0.4),
+                                          borderRadius: BorderRadius.circular(10),
+                                          // Show focus ring when focused
+                                          border: isFocused 
+                                              ? Border.all(color: AppColors.accent, width: 2)
+                                              : null,
+                                          boxShadow: isFocused
+                                              ? [BoxShadow(
+                                                  color: AppColors.accent.withValues(alpha: 0.3),
+                                                  blurRadius: 4,
+                                                  spreadRadius: 1,
+                                                )]
+                                              : null,
+                                        ),
+                                        child: Icon(
+                                          Icons.arrow_upward_rounded,
+                                          color: canSend 
+                                              ? Colors.white 
+                                              : Colors.white.withValues(alpha: 0.7),
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             );
                           },
