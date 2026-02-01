@@ -466,13 +466,13 @@ class _ChatPageState extends State<ChatPage> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'profile',
                 child: Row(
                   children: [
-                    Icon(Icons.account_circle_outlined, size: 20),
-                    SizedBox(width: 8),
-                    Text('个人信息'),
+                    const Icon(Icons.account_circle_outlined, size: 20),
+                    const SizedBox(width: 8),
+                    Text(l10n.profile),
                   ],
                 ),
               ),

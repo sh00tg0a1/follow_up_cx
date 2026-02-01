@@ -642,4 +642,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatViewEvents => 'My Events';
+
+  // ============ Profile Page ============
+
+  @override
+  String get profile => 'Profile';
+
+  @override
+  String get accountInfo => 'Account Info';
+
+  @override
+  String get userId => 'User ID';
+
+  @override
+  String get registeredAt => 'Registered At';
+
+  @override
+  String get quickActions => 'Quick Actions';
+
+  @override
+  String get myEvents => 'My Events';
+
+  @override
+  String get aiAssistant => 'AI Assistant';
+
+  @override
+  String get loadFailed => 'Load failed';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get unableToGetUserInfo => 'Unable to get user info';
 }

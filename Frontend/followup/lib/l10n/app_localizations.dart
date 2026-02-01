@@ -1305,6 +1305,68 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My Events'**
   String get chatViewEvents;
+
+  // ============ Profile Page ============
+
+  /// No description provided for @profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profile;
+
+  /// No description provided for @accountInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Info'**
+  String get accountInfo;
+
+  /// No description provided for @userId.
+  ///
+  /// In en, this message translates to:
+  /// **'User ID'**
+  String get userId;
+
+  /// No description provided for @registeredAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Registered At'**
+  String get registeredAt;
+
+  /// No description provided for @quickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Actions'**
+  String get quickActions;
+
+  /// No description provided for @myEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'My Events'**
+  String get myEvents;
+
+  /// No description provided for @aiAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Assistant'**
+  String get aiAssistant;
+
+  /// No description provided for @loadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Load failed'**
+  String get loadFailed;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// No description provided for @unableToGetUserInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to get user info'**
+  String get unableToGetUserInfo;
 }
 
 class _AppLocalizationsDelegate

@@ -619,4 +619,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatViewEvents => '我的活动';
+
+  // ============ Profile Page ============
+
+  @override
+  String get profile => '个人信息';
+
+  @override
+  String get accountInfo => '账户信息';
+
+  @override
+  String get userId => '用户 ID';
+
+  @override
+  String get registeredAt => '注册时间';
+
+  @override
+  String get quickActions => '快捷操作';
+
+  @override
+  String get myEvents => '我的日程';
+
+  @override
+  String get aiAssistant => 'AI 助手';
+
+  @override
+  String get loadFailed => '加载失败';
+
+  @override
+  String get retry => '重试';
+
+  @override
+  String get unableToGetUserInfo => '无法获取用户信息';
 }

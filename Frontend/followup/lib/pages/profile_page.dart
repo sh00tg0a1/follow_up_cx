@@ -47,17 +47,18 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _logout() {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('确认退出'),
-        content: const Text('确定要退出登录吗？'),
+        title: Text(l10n.confirmLogout),
+        content: Text(l10n.confirmLogoutMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -68,7 +69,7 @@ class _ProfilePageState extends State<ProfilePage> {
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.error,
             ),
-            child: const Text('退出'),
+            child: Text(l10n.logout),
           ),
         ],
       ),
@@ -79,6 +80,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = _userDetails ?? authProvider.user;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundStart,
@@ -87,14 +89,14 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Column(
             children: [
               // Header
-              _buildHeader(context),
+              _buildHeader(context, l10n),
               // Content
               Expanded(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : _error != null
-                        ? _buildErrorView()
-                        : _buildContent(user),
+                        ? _buildErrorView(l10n)
+                        : _buildContent(user, l10n),
               ),
             ],
           ),
@@ -103,7 +105,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -129,9 +131,9 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(width: 12),
           // Title
-          const Text(
-            '个人信息',
-            style: TextStyle(
+          Text(
+            l10n.profile,
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -151,7 +153,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildErrorView() {
+  Widget _buildErrorView(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -163,7 +165,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: 16),
           Text(
-            _error ?? '加载失败',
+            _error ?? l10n.loadFailed,
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 16,
@@ -173,17 +175,17 @@ class _ProfilePageState extends State<ProfilePage> {
           FilledButton.icon(
             onPressed: _loadUserDetails,
             icon: const Icon(Icons.refresh),
-            label: const Text('重试'),
+            label: Text(l10n.retry),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContent(User? user) {
+  Widget _buildContent(User? user, AppLocalizations l10n) {
     if (user == null) {
-      return const Center(
-        child: Text('无法获取用户信息'),
+      return Center(
+        child: Text(l10n.unableToGetUserInfo),
       );
     }
 
@@ -195,13 +197,13 @@ class _ProfilePageState extends State<ProfilePage> {
           _buildProfileCard(user),
           const SizedBox(height: 24),
           // Account Info
-          _buildInfoSection(user),
+          _buildInfoSection(user, l10n),
           const SizedBox(height: 24),
           // Actions
-          _buildActionsSection(),
+          _buildActionsSection(l10n),
           const SizedBox(height: 48),
           // Logout Button
-          _buildLogoutButton(),
+          _buildLogoutButton(l10n),
         ],
       ),
     );
@@ -285,7 +287,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildInfoSection(User user) {
+  Widget _buildInfoSection(User user, AppLocalizations l10n) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardBg,
@@ -300,11 +302,11 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
             child: Text(
-              '账户信息',
-              style: TextStyle(
+              l10n.accountInfo,
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textMuted,
@@ -314,20 +316,20 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           _buildInfoItem(
             icon: Icons.person_outline,
-            label: '用户名',
+            label: l10n.username,
             value: user.username,
           ),
           _buildDivider(),
           _buildInfoItem(
             icon: Icons.tag,
-            label: '用户 ID',
+            label: l10n.userId,
             value: user.id.toString(),
           ),
           if (user.createdAt != null) ...[
             _buildDivider(),
             _buildInfoItem(
               icon: Icons.calendar_today_outlined,
-              label: '注册时间',
+              label: l10n.registeredAt,
               value: DateFormat('yyyy-MM-dd HH:mm').format(user.createdAt!),
             ),
           ],
@@ -394,7 +396,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildActionsSection() {
+  Widget _buildActionsSection(AppLocalizations l10n) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardBg,
@@ -409,11 +411,11 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
             child: Text(
-              '快捷操作',
-              style: TextStyle(
+              l10n.quickActions,
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textMuted,
@@ -423,13 +425,13 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           _buildActionItem(
             icon: Icons.event_outlined,
-            label: '我的日程',
+            label: l10n.myEvents,
             onTap: () => Navigator.pushNamed(context, '/events'),
           ),
           _buildDivider(),
           _buildActionItem(
             icon: Icons.chat_outlined,
-            label: 'AI 助手',
+            label: l10n.aiAssistant,
             onTap: () => Navigator.pushNamed(context, '/chat'),
           ),
           const SizedBox(height: 8),
@@ -485,13 +487,13 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildLogoutButton() {
+  Widget _buildLogoutButton(AppLocalizations l10n) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: _logout,
         icon: const Icon(Icons.logout, size: 20),
-        label: const Text('退出登录'),
+        label: Text(l10n.logout),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.error,
           side: const BorderSide(color: AppColors.error),
