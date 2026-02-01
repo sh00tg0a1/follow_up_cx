@@ -131,6 +131,29 @@ class MockService {
     );
   }
 
+  // 模拟更新活动
+  static Future<EventData> updateEvent(int id, {
+    String? title,
+    DateTime? startTime,
+    DateTime? endTime,
+    String? location,
+    String? description,
+    bool? isFollowed,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    
+    final events = await getEvents();
+    final event = events.firstWhere((e) => e.id == id);
+    return event.copyWith(
+      title: title ?? event.title,
+      startTime: startTime ?? event.startTime,
+      endTime: endTime ?? event.endTime,
+      location: location ?? event.location,
+      description: description ?? event.description,
+      isFollowed: isFollowed ?? event.isFollowed,
+    );
+  }
+
   // 模拟删除活动
   static Future<void> deleteEvent(int id) async {
     await Future.delayed(const Duration(milliseconds: 200));

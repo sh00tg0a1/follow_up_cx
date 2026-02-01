@@ -117,6 +117,52 @@ class ApiService {
     }
   }
 
+  // 更新活动
+  // PUT /api/events/{id} - 支持部分更新
+  static Future<EventData> updateEvent(int id, {
+    String? title,
+    DateTime? startTime,
+    DateTime? endTime,
+    String? location,
+    String? description,
+    bool? isFollowed,
+    String? recurrenceRule,
+    DateTime? recurrenceEnd,
+  }) async {
+    if (useMock) {
+      return MockService.updateEvent(id,
+        title: title,
+        startTime: startTime,
+        endTime: endTime,
+        location: location,
+        description: description,
+        isFollowed: isFollowed,
+      );
+    }
+
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (startTime != null) body['start_time'] = startTime.toIso8601String();
+    if (endTime != null) body['end_time'] = endTime.toIso8601String();
+    if (location != null) body['location'] = location;
+    if (description != null) body['description'] = description;
+    if (isFollowed != null) body['is_followed'] = isFollowed;
+    if (recurrenceRule != null) body['recurrence_rule'] = recurrenceRule;
+    if (recurrenceEnd != null) body['recurrence_end'] = recurrenceEnd.toIso8601String();
+
+    final response = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/api/events/$id"),
+      headers: await _authHeaders(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      return EventData.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception("更新活动失败");
+    }
+  }
+
   // 删除活动
   static Future<void> deleteEvent(int id) async {
     if (useMock) {
