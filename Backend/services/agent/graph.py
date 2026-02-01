@@ -211,53 +211,59 @@ def handle_create_event(state: AgentState) -> AgentState:
     elif state.get("image_base64"):
         images_base64 = [state["image_base64"]]
     
-    # Use batch parsing if multiple images
+    # Process multiple images individually to ensure correct thumbnail assignment
     if len(images_base64) > 1:
         logger.info(f"Processing {len(images_base64)} images for event creation")
         try:
-            from services.llm_service import parse_images_with_llm
+            from services.llm_service import parse_image_with_llm
             from services.image_utils import generate_thumbnail
             
-            # Batch parse multiple images
-            parsed_events = parse_images_with_llm(images_base64, state.get("message", ""))
-            
-            if not parsed_events:
-                # If no events parsed, fallback to single image/text processing
-                logger.warning(f"No events parsed from {len(images_base64)} images, falling back to text extraction")
-                images_base64 = images_base64[:1]  # Only use first image
-            
-            # Create database records for each parsed event
+            # Process each image individually to assign correct thumbnails
             created_events = []
             duplicate_events = []
-            for parsed_event in parsed_events:
-                # Check for duplicates
-                duplicate = check_duplicate_event(
-                    db, state["user_id"], parsed_event.title, parsed_event.start_time
-                )
-                if duplicate:
-                    duplicate_events.append(duplicate)
-                    logger.info(f"Duplicate event detected: {parsed_event.title} at {parsed_event.start_time}")
+            
+            for idx, image_base64 in enumerate(images_base64):
+                try:
+                    # Parse each image individually
+                    result = parse_image_with_llm(image_base64, state.get("message", ""))
+                    parsed_events = result.events
+                    
+                    if not parsed_events:
+                        logger.debug(f"No events parsed from image {idx+1}/{len(images_base64)}")
+                        continue
+                    
+                    # Generate thumbnail for this specific image
+                    thumbnail = generate_thumbnail(image_base64)
+                    
+                    # Create database records for each parsed event from this image
+                    for parsed_event in parsed_events:
+                        # Check for duplicates
+                        duplicate = check_duplicate_event(
+                            db, state["user_id"], parsed_event.title, parsed_event.start_time
+                        )
+                        if duplicate:
+                            duplicate_events.append(duplicate)
+                            logger.info(f"Duplicate event detected: {parsed_event.title} at {parsed_event.start_time}")
+                            continue
+                        
+                        # Use thumbnail from the current image
+                        event = Event(
+                            user_id=state["user_id"],
+                            title=parsed_event.title,
+                            start_time=parsed_event.start_time,
+                            end_time=parsed_event.end_time,
+                            location=parsed_event.location,
+                            description=parsed_event.description,
+                            source_type="agent",
+                            source_thumbnail=thumbnail or parsed_event.source_thumbnail,
+                            is_followed=True,
+                        )
+                        db.add(event)
+                        created_events.append(event)
+                        
+                except Exception as img_error:
+                    logger.warning(f"Failed to process image {idx+1}/{len(images_base64)}: {img_error}")
                     continue
-                
-                # Generate thumbnail (using first image)
-                thumbnail = None
-                if images_base64:
-                    thumbnail = generate_thumbnail(images_base64[0])
-                
-                # parsed_event is a ParsedEvent object
-                event = Event(
-                    user_id=state["user_id"],
-                    title=parsed_event.title,
-                    start_time=parsed_event.start_time,
-                    end_time=parsed_event.end_time,
-                    location=parsed_event.location,
-                    description=parsed_event.description,
-                    source_type="agent",
-                    source_thumbnail=thumbnail or parsed_event.source_thumbnail,
-                    is_followed=True,
-                )
-                db.add(event)
-                created_events.append(event)
             
             db.commit()
             for event in created_events:
